@@ -1,0 +1,88 @@
+<!-- src/web/index.html -->
+<!-- サンプル業務システム ハンズオン: フロントエンド -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>サンプル業務システム (ハンズオン)</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #0078d4; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 16px 0; }
+    .status { color: #107c10; font-weight: bold; }
+    .error { color: #d13438; font-weight: bold; }
+    button { background: #0078d4; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 4px; }
+    button:hover { background: #106ebe; }
+    pre { background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>サンプル業務システム</h1>
+  <p>Azure Static Web Apps ハンズオン用サンプルアプリケーション</p>
+
+  <div class="card">
+    <h2>システムステータス</h2>
+    <p>API 状態: <span id="api-status">確認中...</span></p>
+    <button onclick="checkHealth()">ヘルスチェック実行</button>
+    <button onclick="checkStatus()">ステータス取得</button>
+    <pre id="api-response"></pre>
+  </div>
+
+  <div class="card">
+    <h2>認証情報 (Easy Auth)</h2>
+    <p>ログイン状態: <span id="auth-status">確認中...</span></p>
+    <button onclick="location.href='/.auth/login/aad'">Entra ID でログイン</button>
+    <button onclick="location.href='/.auth/logout'">ログアウト</button>
+    <pre id="auth-info"></pre>
+  </div>
+
+  <script>
+    // API ヘルスチェック
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        document.getElementById('api-status').textContent = data.status;
+        document.getElementById('api-status').className = 'status';
+        document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        document.getElementById('api-status').textContent = 'エラー: ' + e.message;
+        document.getElementById('api-status').className = 'error';
+      }
+    }
+
+    // ステータス取得
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        document.getElementById('api-response').textContent = 'エラー: ' + e.message;
+      }
+    }
+
+    // 認証情報の取得 (SWA Easy Auth)
+    async function checkAuth() {
+      try {
+        const res = await fetch('/.auth/me');
+        const data = await res.json();
+        if (data.clientPrincipal) {
+          document.getElementById('auth-status').textContent = 'ログイン済み (' + data.clientPrincipal.userDetails + ')';
+          document.getElementById('auth-status').className = 'status';
+          document.getElementById('auth-info').textContent = JSON.stringify(data.clientPrincipal, null, 2);
+        } else {
+          document.getElementById('auth-status').textContent = '未ログイン';
+        }
+      } catch (e) {
+        document.getElementById('auth-status').textContent = '確認不可';
+      }
+    }
+
+    // 初期化
+    checkHealth();
+    checkAuth();
+  </script>
+</body>
+</html>

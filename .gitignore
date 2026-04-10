@@ -1,0 +1,25 @@
+# 要件定義書・機密文書
+cloud-requirements.md
+02_別紙1*.docx
+
+# 講師用資料
+docs/instructor-notes.md
+
+# 生成物・PDF
+*.pdf
+
+# スクリーンショット自動化ツール（ドライラン用）
+scripts/screenshots/
+
+# Windows 誤生成ファイル
+nul
+
+# Node.js
+node_modules/
+
+# Playwright
+.browser-data/
+
+# OS
+Thumbs.db
+.DS_Store

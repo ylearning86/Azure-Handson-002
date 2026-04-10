@@ -1,0 +1,66 @@
+graph TB
+    subgraph Internet["インターネット"]
+        User["ユーザー<br/>(PC / スマホ)"]
+    end
+
+    subgraph Azure["Azure (Japan East)"]
+        subgraph AppGWSubnet["Application Gateway サブネット (10.0.0.0/24)"]
+            AGW["Application Gateway v2<br/>+ WAF (OWASP 3.2)<br/>+ SSL 終端"]
+        end
+
+        subgraph PESubnet["Private Endpoint サブネット (10.0.4.0/24)"]
+            PE_SWA["Private Endpoint<br/>(SWA)"]
+        end
+
+        subgraph SWAService["Azure Static Web Apps (Standard)"]
+            SWA["静的 HTML/JS<br/>+ Easy Auth"]
+        end
+
+        subgraph AppSubnet["アプリケーション サブネット (10.0.1.0/24)"]
+            Func["Azure Functions<br/>(Linked Backend)<br/>マネージド ID 有効"]
+        end
+
+        subgraph DataSubnet["データ サブネット (10.0.2.0/24)"]
+            PG["Azure Database<br/>for PostgreSQL<br/>Flexible Server"]
+            Blob["Azure Blob<br/>Storage (GRS)"]
+        end
+
+        subgraph MgmtSubnet["管理 サブネット (10.0.3.0/24)"]
+            KV["Azure<br/>Key Vault"]
+        end
+
+        subgraph Monitoring["監視・セキュリティ"]
+            LAW["Log Analytics"]
+            AppIn["Application<br/>Insights"]
+            Defender["Microsoft<br/>Defender"]
+        end
+
+        subgraph DR["バックアップ (Japan West)"]
+            GRS["Geo-redundant<br/>Backup / DR"]
+        end
+    end
+
+    User -->|HTTPS| AGW
+    AGW -->|"バックエンドプール<br/>(プライベート IP)"| PE_SWA
+    PE_SWA -->|VNet 統合| SWA
+    SWA -->|"/api/* Linked Backend"| Func
+    Func -->|マネージド ID| PG
+    Func -->|Private Endpoint| Blob
+    Func -->|マネージド ID| KV
+    Func -.->|テレメトリ| AppIn
+    AGW -.->|WAF / アクセスログ| LAW
+    KV -.->|監査ログ| LAW
+    PG -.->|Geo-backup| GRS
+    Blob -.->|GRS レプリケーション| GRS
+
+    classDef azure fill:#0078d4,color:#fff,stroke:#005a9e
+    classDef security fill:#e74856,color:#fff,stroke:#c42b1c
+    classDef data fill:#107c10,color:#fff,stroke:#0b6a0b
+    classDef monitor fill:#5c2d91,color:#fff,stroke:#4b2378
+    classDef pe fill:#ff8c00,color:#fff,stroke:#e67e00
+
+    class SWA,AGW,Func azure
+    class KV,Defender security
+    class PG,Blob,GRS data
+    class LAW,AppIn monitor
+    class PE_SWA pe
