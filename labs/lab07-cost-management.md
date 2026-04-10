@@ -18,6 +18,18 @@
 
 ---
 
+## アジェンダ
+
+- [Step 1: 現在のコストを確認](#step-1-現在のコストを確認)
+- [Step 2: 予算アラートの設定](#step-2-予算アラートの設定)
+- [Step 3: Azure Advisor でコスト最適化推奨を確認](#step-3-azure-advisor-でコスト最適化推奨を確認)
+- [Step 4: リソースのタグ付けによるコスト管理](#step-4-リソースのタグ付けによるコスト管理)
+- [Step 5: コスト最適化のベストプラクティス確認](#step-5-コスト最適化のベストプラクティス確認)
+- [Step 6: ポータルでコスト分析を確認](#step-6-ポータルでコスト分析を確認)
+- [理解度チェック](#理解度チェック)
+
+---
+
 ## Step 1: 現在のコストを確認
 
 ```bash
@@ -234,7 +246,7 @@ IaC                      →  Bicep + Git
 サーバレス Web           →  Azure Static Web Apps (Standard)
 サーバレス API           →  Azure Functions (Linked Backend + マネージド ID)
 WAF / L7 ロードバランサー →  Application Gateway v2 + WAF
-SWA パブリックアクセス過断  →  Private Endpoint + allowedIpRanges
+SWA パブリックアクセス遮断  →  Private Endpoint + allowedIpRanges
 マネージドDB               →  Azure Database for PostgreSQL
 シークレット管理            →  Azure Key Vault
 RBAC / 最小特権            →  Azure RBAC + マネージド ID

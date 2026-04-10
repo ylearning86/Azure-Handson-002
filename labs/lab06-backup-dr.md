@@ -20,6 +20,18 @@
 
 ---
 
+## アジェンダ
+
+- [Step 1: Azure Database for PostgreSQL Flexible Server の作成](#step-1-azure-database-for-postgresql-flexible-server-の作成)
+- [Step 2: バックアップ設定の確認](#step-2-バックアップ設定の確認)
+- [Step 3: PITR (Point-in-Time Restore) の体験](#step-3-pitr-point-in-time-restore-の体験)
+- [Step 4: Blob Storage のバックアップ (長期アーカイブ)](#step-4-blob-storage-のバックアップ-長期アーカイブ)
+- [Step 5: ライフサイクル管理ポリシー](#step-5-ライフサイクル管理ポリシー)
+- [Step 6: レプリケーション状態の確認](#step-6-レプリケーション状態の確認)
+- [理解度チェック](#理解度チェック)
+
+---
+
 ## Step 1: Azure Database for PostgreSQL Flexible Server の作成
 
 要件: 「マネージドサービスを最大限活用」「ゾーン冗長でSPOF排除」
@@ -42,6 +54,7 @@ az postgres flexible-server create \
   --geo-redundant-backup Disabled \
   --yes
 
+# ※ --high-availability は非推奨です。将来は --zonal-resiliency を使用してください
 # ※ ハンズオン環境ではコスト節約のため HA と Geo-backup を Disabled にしています
 # 本番環境では以下のように設定します:
 #   --high-availability ZoneRedundant   (要件: マルチAZ)
@@ -56,6 +69,10 @@ az postgres flexible-server create \
 > | HA | Disabled | ZoneRedundant |
 > | Geo-backup | Disabled | Enabled |
 > | Retention | 28日 | 35日 |
+
+**作成結果 (Azure Portal)**:
+
+![PostgreSQL 概要](../docs/screenshots/lab06/01-postgres-overview.png)
 
 ## Step 2: バックアップ設定の確認
 
@@ -154,6 +171,14 @@ az storage account blob-service-properties update \
   --enable-delete-retention true \
   --delete-retention-days 30
 ```
+
+> **注意**: ストレージアカウント作成時に `allowSharedKeyAccess` が `false` になる場合があります (ポリシーによる)。その場合は `az storage account update --name "${PREFIX}backup" --resource-group $RG_NAME --allow-shared-key-access true --tags SecurityControl=Ignore` で有効化してください。
+
+**ストレージアカウント概要 (Azure Portal)**:
+
+![ストレージ概要](../docs/screenshots/lab06/03-storage-overview.png)
+
+*GRS (Japan East → Japan West)、バージョン管理: 有効、論理的な削除: 有効 (30日) が確認できます*
 
 ## Step 5: ライフサイクル管理ポリシー
 

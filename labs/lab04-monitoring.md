@@ -19,9 +19,24 @@
 
 ---
 
+## アジェンダ
+
+- [Step 1: Application Insights でパフォーマンス監視を設定](#step-1-application-insights-でパフォーマンス監視を設定)
+- [Step 2: アラートルールの作成](#step-2-アラートルールの作成)
+- [Step 3: SWA の可用性確認](#step-3-swa-の可用性確認)
+- [Step 4: Log Analytics でクエリを実行](#step-4-log-analytics-でクエリを実行)
+- [Step 5: Azure ダッシュボードの作成](#step-5-azure-ダッシュボードの作成)
+- [Step 6: サービス正常性アラートの設定](#step-6-サービス正常性アラートの設定)
+- [理解度チェック](#理解度チェック)
+
+---
+
 ## Step 1: Application Insights でパフォーマンス監視を設定
 
 要件: 「レスポンスタイムの遵守率80%以上」
+
+> **注意**: `az monitor app-insights` コマンドの初回実行時に `application-insights` 拡張のインストールを求められます。`Y` を入力してインストールしてください。
+> 事前にインストールする場合: `az extension add --name application-insights`
 
 ```bash
 # Application Insights の接続文字列を取得
@@ -38,6 +53,10 @@ az staticwebapp appsettings set \
 
 echo "Application Insights の接続文字列を SWA に設定しました"
 ```
+
+**確認**: Azure Portal で Application Insights の概要を確認できます。
+
+![Application Insights 概要](../docs/screenshots/lab04/01-appinsights-overview.png)
 
 ## Step 2: アラートルールの作成
 
@@ -59,7 +78,8 @@ APPI_ID=$(az monitor app-insights component show \
   --resource-group $RG_NAME \
   --query id -o tsv)
 
-az monitor metrics alert create \
+# Git Bash の場合、--scopes のパスが変換されるため MSYS_NO_PATHCONV=1 を付与
+MSYS_NO_PATHCONV=1 az monitor metrics alert create \
   --name "alert-response-time" \
   --resource-group $RG_NAME \
   --scopes "$APPI_ID" \
@@ -71,11 +91,15 @@ az monitor metrics alert create \
   --action "ag-handson-ops"
 ```
 
+**確認**: アラートルールが正しく作成されたことをポータルで確認できます。
+
+![レスポンスタイムアラート](../docs/screenshots/lab04/02-alert-response-time.png)
+
 ### アラート: エラー率上昇
 
 ```bash
 # HTTP 5xx エラー率アラート
-az monitor metrics alert create \
+MSYS_NO_PATHCONV=1 az monitor metrics alert create \
   --name "alert-error-rate" \
   --resource-group $RG_NAME \
   --scopes "$APPI_ID" \
@@ -98,17 +122,18 @@ az staticwebapp show \
   --resource-group $RG_NAME \
   --query "{name:name, defaultHostname:defaultHostname, sku:sku.name}" -o json
 
-# SWA のヘルスチェック
+# SWA のヘルスチェック (Lab 03 で WAF を設定済みのため、SWA 直接アクセスは 403 になります)
 SWA_URL=$(az staticwebapp show \
   --name "swa-${PREFIX}" \
   --resource-group $RG_NAME \
   --query "defaultHostname" -o tsv)
 
-curl -s "https://${SWA_URL}/api/health" | python -m json.tool
+curl -s "https://${SWA_URL}/api/health" | python -m json.tool || echo "WAF により直接アクセスはブロックされています (Lab 03 で設定済み)"
 ```
 
-> SWA はグローバルに分散された CDN でホスティングされ、単一障害点が排除されています。  
-> Managed Functions もマネージド環境で自動的に復旧されます。
+> **ポイント**: SWA はグローバルに分散された CDN でホスティングされ、単一障害点が排除されています。  
+> Managed Functions もマネージド環境で自動的に復旧されます。  
+> Lab 03 で WAF を設定済みのため、SWA への直接アクセスは 403 が返ります。Application Gateway 経由でのアクセスが正規ルートです。
 
 ## Step 4: Log Analytics でクエリを実行
 
@@ -186,6 +211,10 @@ az monitor activity-log alert create \
   --description "Azure サービスの障害・メンテナンス通知"
 ```
 
+**確認**: サービス正常性アラートがアクティビティログアラートルールとして作成されます。
+
+![サービス正常性アラート](../docs/screenshots/lab04/05-service-health-alert.png)
+
 ---
 
 ## 理解度チェック
@@ -205,9 +234,9 @@ az monitor activity-log alert create \
 | レスポンスタイム監視 | Application Insights + メトリクスアラート |
 | ダッシュボード可視化 | Azure ダッシュボード + Application Insights |
 | 障害検知と自動通知 | アラートルール + アクショングループ |
-| SPOF 排除 | ACA 複数レプリカ + ヘルスプローブ |
+| SPOF 排除 | SWA グローバル CDN + Functions 自動復旧 |
 | クラウドサービス変更の検知 | Azure サービス正常性アラート |
 
 ---
 
-**次のステップ**: [Lab 05: GitHub Actions CI/CD](lab05-cicd.md)
+**次のステップ**: [Lab 05: SWA 組込み CI/CD](lab05-cicd.md)

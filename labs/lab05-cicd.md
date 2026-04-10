@@ -17,6 +17,20 @@
 
 ---
 
+## アジェンダ
+
+- [SWA の CI/CD の特長](#swa-の-cicd-の特長)
+- [Step 1: GitHub リポジトリの準備](#step-1-github-リポジトリの準備)
+- [Step 2: SWA と GitHub リポジトリを連携](#step-2-swa-と-github-リポジトリを連携)
+- [Step 3: GitHub Actions ワークフローの作成](#step-3-github-actions-ワークフローの作成)
+- [Step 4: CI/CD パイプラインのテスト](#step-4-cicd-パイプラインのテスト)
+- [Step 5: プレビュー環境 (Pull Request 連携)](#step-5-プレビュー環境-pull-request-連携)
+- [Step 6: デプロイ状況の確認](#step-6-デプロイ状況の確認)
+- [セキュリティ補足: CI/CD パイプラインのセキュリティ](#セキュリティ補足-cicd-パイプラインのセキュリティ)
+- [理解度チェック](#理解度チェック)
+
+---
+
 ## SWA の CI/CD の特長
 
 Static Web Apps は GitHub/Azure DevOps との**組込み CI/CD**を提供します。これは要件の「クラウド提供の CI/CD パイプラインもしくはマネージドサービスと連携」に直接対応します。
@@ -45,27 +59,43 @@ git commit -m "handson: SWA + serverless API" 2>/dev/null
 # gh repo create Azure-Handson-002 --public --source=. --remote=origin --push
 ```
 
+**確認**: GitHub リポジトリにコードがプッシュされていることを確認します。
+
+![GitHub リポジトリ](../docs/screenshots/lab05/01-github-repo.png)
+
 ## Step 2: SWA と GitHub リポジトリを連携
 
-SWA を GitHub リポジトリに接続すると、GitHub Actions ワークフローが **自動生成**されます。
-
-### 方法 A: Azure CLI で連携
+### 方法 A: Azure CLI + GitHub CLI で連携
 
 ```bash
-# GitHub のパーソナルアクセストークンを設定
-# https://github.com/settings/tokens で "repo" と "workflow" スコープのトークンを作成
-# export GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxx"
+# 1. SWA と GitHub リポジトリを接続
+GH_TOKEN=$(gh auth token)
 
-# SWA と GitHub リポジトリを連携
 az staticwebapp update \
   --name "swa-${PREFIX}" \
   --resource-group $RG_NAME \
   --source "https://github.com/<your-username>/Azure-Handson-002" \
   --branch main \
-  --app-location "src/web" \
-  --api-location "src/api" \
-  --token "$GITHUB_TOKEN"
+  --token "$GH_TOKEN"
+
+# 2. SWA のデプロイトークンを GitHub Secrets に登録
+SWA_TOKEN=$(az staticwebapp secrets list \
+  --name "swa-${PREFIX}" \
+  --resource-group $RG_NAME \
+  --query "properties.apiKey" -o tsv)
+
+gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN \
+  --body "$SWA_TOKEN" \
+  --repo <your-username>/Azure-Handson-002
+
+# 3. Secrets が登録されたことを確認
+gh secret list --repo <your-username>/Azure-Handson-002
 ```
+
+> **確認**: `gh secret list` で `AZURE_STATIC_WEB_APPS_API_TOKEN` が表示されれば OK です。
+> GitHub の Settings → Secrets and variables → Actions ページでも確認できます。
+
+> **注意**: `az staticwebapp update` の `--app-location` / `--api-location` パラメータは CLI ではサポートされません。ビルド設定はワークフロー YAML で指定します。
 
 ### 方法 B: Azure Portal で連携 (推奨)
 
@@ -80,9 +110,15 @@ az staticwebapp update \
    - 出力の場所: (空白)
 4. **保存** → GitHub Actions ワークフローが自動生成される
 
-## Step 3: 自動生成されたワークフローの確認
+**確認**: SWA 概要ページで「ソース: main (GitHub)」と表示されていれば連携成功です。
 
-SWA は `.github/workflows/` に以下のようなワークフローを自動生成します:
+![SWA GitHub連携後の概要](../docs/screenshots/lab05/04-swa-overview.png)
+
+## Step 3: GitHub Actions ワークフローの作成
+
+> **注意**: Portal から GitHub 連携した場合はワークフローが自動生成されますが、CLI で連携した場合や既存 SWA の場合は手動作成が必要です。
+
+`.github/workflows/azure-static-web-apps.yml` を作成します:
 
 ```yaml
 # .github/workflows/azure-static-web-apps-<random>.yml (自動生成)
@@ -136,17 +172,44 @@ jobs:
 - OIDC のような追加認証設定が**不要**
 - Push と Pull Request の両方に対応
 
+**確認**: GitHub リポジトリの `.github/workflows/` にワークフロー YAML が登録されていることを確認します。
+
+![GitHub ワークフロー YAML](../docs/screenshots/lab05/03b-github-workflow-yaml.png)
+
 ## Step 4: CI/CD パイプラインのテスト
 
+まず、FQDN 経由でブラウザからアプリの現在の状態を確認しておきます。
+
+**変更前のアプリ画面:**
+
+![変更前の Web サイト](../docs/screenshots/lab05/04-web-before.png)
+
+次に、ソースコードに変更を加えて push します。
+
 ```bash
-# ソースコードに変更を加えてプッシュ
 cd src/web
 
-# index.html の title を変更 (例)
-# git add . && git commit -m "feat: update title" && git push
+# index.html のタイトルと説明文を変更
+sed -i 's/サンプル業務システム (ハンズオン)/サンプル業務システム v2 (ハンズオン)/' index.html
+sed -i 's/<h1>サンプル業務システム</<h1>サンプル業務システム v2</' index.html
+sed -i 's/ハンズオン用サンプルアプリケーション/ハンズオン用サンプルアプリケーション (CI\/CD でデプロイ済み)/' index.html
+
+git add .
+git commit -m "feat: update title to v2 for CI/CD demo"
+git push origin main
 ```
 
 GitHub Actions タブでワークフローの実行を確認してください。
+
+![GitHub Actions 実行結果](../docs/screenshots/lab05/03-github-actions.png)
+
+ワークフロー完了後、ブラウザで再度アクセスし、変更が反映されていることを確認します。
+
+**変更後のアプリ画面:**
+
+![変更後の Web サイト](../docs/screenshots/lab05/04-web-after.png)
+
+> **ポイント**: `git push` するだけで、ビルド・デプロイが自動実行され、数分後にはブラウザで変更を確認できます。これが SWA の組込み CI/CD の利便性です。
 
 ## Step 5: プレビュー環境 (Pull Request 連携)
 
@@ -177,7 +240,14 @@ PR #2         → https://xxx-2.azurestaticapps.net/        (プレビュー)
 - PR をクローズすると**プレビュー環境が自動削除**
 - これが要件の「テスト環境で事前検証後に本番環境にリリース」に対応
 
+> **注意**: Lab 03 で Private Endpoint を設定済みの場合、プレビュー環境への直接アクセスは 403 になります。
+> プレビュー環境の動作確認は Application Gateway 経由、または Private Endpoint を一時的に無効化して行います。
+
 ## Step 6: デプロイ状況の確認
+
+### SWA のデプロイ状態確認
+
+> **注**: FQDN (`${PREFIX}.japaneast.cloudapp.azure.com`) は Lab 03 Step 4 でパブリック IP 作成時に設定済みです。
 
 ```bash
 # SWA のデプロイ履歴
@@ -185,16 +255,21 @@ az staticwebapp show \
   --name "swa-${PREFIX}" \
   --resource-group $RG_NAME \
   --query "{name:name, defaultHostname:defaultHostname, branch:branch}" -o json
-
-# 現在の URL
-SWA_URL=$(az staticwebapp show \
-  --name "swa-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --query "defaultHostname" -o tsv)
-
-echo "本番 URL: https://${SWA_URL}"
-curl -s "https://${SWA_URL}/api/health" | python -m json.tool
 ```
+
+### ブラウザで動作確認
+
+App Gateway の FQDN 経由でアプリにアクセスし、CI/CD でデプロイされた内容が反映されていることを確認します。
+
+```bash
+echo "ブラウザでアクセス: https://${PREFIX}.japaneast.cloudapp.azure.com/"
+```
+
+> **Note**: 自己署名証明書のため、ブラウザに証明書の警告が表示されます。「詳細設定」→「安全でないページに移動」で続行してください。
+
+![FQDN 経由のブラウザアクセス](../docs/screenshots/lab05/06-app-browser.png)
+
+> **ポイント**: GitHub に push するだけで、SWA が自動ビルド & デプロイし、App Gateway 経由で更新後のアプリにアクセスできます。
 
 ---
 

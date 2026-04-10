@@ -18,6 +18,22 @@
 
 ---
 
+## アジェンダ
+
+- [Linked Backend とは](#linked-backend-とは)
+- [Step 1: サンプルアプリケーションの確認](#step-1-サンプルアプリケーションの確認)
+- [Step 2: Azure Static Web Apps の作成 (Standard プラン)](#step-2-azure-static-web-apps-の作成-standard-プラン)
+- [Step 3: 単体 Azure Functions App の作成](#step-3-単体-azure-functions-app-の作成)
+- [Step 4: Functions App に API コードをデプロイ](#step-4-functions-app-に-api-コードをデプロイ)
+- [Step 5: SWA と Functions App をリンク (Linked Backend)](#step-5-swa-と-functions-app-をリンク-linked-backend)
+- [Step 6: SWA にフロントエンドをデプロイ](#step-6-swa-にフロントエンドをデプロイ)
+- [Step 7: Linked Backend 経由の動作確認](#step-7-linked-backend-経由の動作確認)
+- [Step 8: 組込み認証 (Easy Auth) の設定](#step-8-組込み認証-easy-auth-の設定)
+- [Step 9: ローカル開発 (SWA CLI + Functions)](#step-9-ローカル開発-swa-cli--functions)
+- [理解度チェック](#理解度チェック)
+
+---
+
 ## Linked Backend とは
 
 SWA の API 統合には 2 つの方式があります。本ハンズオンでは**本番推奨の Linked Backend** を使用します。
