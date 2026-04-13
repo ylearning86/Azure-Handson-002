@@ -25,7 +25,7 @@
 - [Step 2: アラートルールの作成](#step-2-アラートルールの作成)
 - [Step 3: SWA の可用性確認](#step-3-swa-の可用性確認)
 - [Step 4: Log Analytics でクエリを実行](#step-4-log-analytics-でクエリを実行)
-- [Step 5: Azure ダッシュボードの作成](#step-5-azure-ダッシュボードの作成)
+- [Step 5: Azure ダッシュボードの確認](#step-5-azure-ダッシュボードの確認)
 - [Step 6: Advisor サービス廃止ブックの確認](#step-6-advisor-サービス廃止ブックの確認)
 - [理解度チェック](#理解度チェック)
 
@@ -74,6 +74,16 @@ AppRequests
 ```
 
 **期待値**: `compliance_rate >= 80`
+
+![KQL compliance_rate 結果](../docs/screenshots/lab04/01b-appinsights-compliance.png)
+
+> **補足: 2つの Application Insights リソースについて**  
+> リソースグループには `appi-${PREFIX}-dev` と `func-${PREFIX}-api` の 2 つの Application Insights が存在します。
+>
+> - **`appi-${PREFIX}-dev`**: Lab 01 の Bicep (IaC) で明示的に作成したもの。SWA の Managed Functions に接続文字列を設定し、アプリ全体の監視に使用します。
+> - **`func-${PREFIX}-api`**: Azure Functions をデプロイした際に Azure が**自動生成**したもの。Functions ランタイム自体のテレメトリが記録されます。
+>
+> 本ハンズオンでは **`appi-${PREFIX}-dev`** を使用します。
 
 ## Step 2: アラートルールの作成
 
@@ -171,43 +181,69 @@ az monitor log-analytics query \
   -o table 2>/dev/null || echo "ログが蓄積されるまで数分かかります"
 ```
 
-### KQL クエリ例: パフォーマンス分析
+### KQL クエリ例: アクセスログと操作ログの確認
 
 Azure Portal の Log Analytics で以下のクエリを実行してみてください:
 
 ```kql
-// 要件: アプリケーション処理時間の分析
-// 直近1時間のリクエストレスポンスタイム分布
-requests
-| where timestamp > ago(1h)
-| summarize
-    p50 = percentile(duration, 50),
-    p95 = percentile(duration, 95),
-    p99 = percentile(duration, 99),
-    count = count()
-  by bin(timestamp, 5m)
-| render timechart
+// アクセスログ: Application Gateway 経由のリクエスト一覧
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.NETWORK"
+    and Category == "ApplicationGatewayAccessLog"
+    and TimeGenerated > ago(1h)
+| extend JST = TimeGenerated + 9h
+| project
+    JST,
+    clientIP_s,
+    clientPort_d,
+    httpMethod_s,
+    requestUri_s,
+    httpStatus_d,
+    timeTaken_d,
+    userAgent_s
+| order by JST desc
+| take 50
 ```
 
-## Step 5: Azure ダッシュボードの作成
+![Log Analytics クエリ結果](../docs/screenshots/lab04/04-law-query.png)
+
+### アクティビティログ（操作ログ）の確認
+
+要件定義の「操作ログ」に対応するのが **アクティビティログ** です。リソースの作成・変更・削除などの管理操作が自動的に記録されます。
+
+1. Azure Portal → **モニター** → **アクティビティ ログ** を開く
+2. リソースグループ `rg-handson-v4` でフィルタリング
+3. 「操作名」「状態」「イベント開始者」などの列で、誰がいつ何を操作したかを確認
+
+![アクティビティログ](../docs/screenshots/lab04/04b-activity-log.png)
+
+> **ポイント**: アクティビティログは Azure が自動的に記録し、**90 日間**保持されます。  
+> Log Analytics ワークスペースに転送する設定 (診断設定) を行えば、KQL でクエリしたり、より長期間の保持も可能です。  
+> アクセスログ (`AzureDiagnostics`)、アプリケーションログ (`AppRequests`, `AppTraces`)、操作ログ (アクティビティログ) を組み合わせることで、要件定義の「システムログを取得・保管し出力可能」を実現しています。
+
+## Step 5: Azure ダッシュボードの確認
 
 要件: 「ダッシュボード等による状況の可視化」
 
-```bash
-# ダッシュボードをポータルで作成する方法:
-echo "=========================================="
-echo "Azure Portal でダッシュボードを作成します"
-echo "=========================================="
-echo ""
-echo "1. Azure Portal (https://portal.azure.com) にアクセス"
-echo "2. 「ダッシュボード」→「新しいダッシュボード」→「空のダッシュボード」"
-echo "3. 以下のタイルを追加:"
-echo "   - Application Insights → パフォーマンス (レスポンスタイム)"
-echo "   - Static Web Apps → デプロイ状態"
-echo "   - Log Analytics → カスタムクエリ結果"
-echo "   - リソースグループ → リソース一覧"
-echo "4. 「保存」をクリック"
-```
+Application Insights を作成すると、Azure が自動的に **概要ダッシュボード** (`appi-${PREFIX}-dev Dashboard`) を生成します。  
+ここでは既存のダッシュボードを開き、可視化の内容を確認します。
+
+### ダッシュボードの確認手順
+
+1. Azure Portal → **[ダッシュボード](https://portal.azure.com/#dashboard)** を開く
+2. ダッシュボード名のドロップダウンから **「appi-${PREFIX}-dev Dashboard」** を選択
+3. 以下のタイルが自動的に配置されていることを確認:
+   - **Usage** — ユーザー数・セッション数
+   - **Reliability** — 失敗したリクエスト数
+   - **Responsiveness** — サーバーレスポンスタイム
+   - **Browser** — ページ読み込み時間
+   - **Average availability** — 可用性
+   - **Server exceptions and Dependency failures** — 例外・依存関係の障害
+
+![Azure ダッシュボード](../docs/screenshots/lab04/05-dashboard.png)
+
+> **ポイント**: Application Insights の概要ダッシュボードは自動生成されますが、必要に応じて「編集」からタイルの追加・削除・配置変更が可能です。  
+> 運用チーム向けに Log Analytics クエリ結果やリソースグループ一覧を追加するなど、カスタマイズも行えます。
 
 ## Step 6: Advisor サービス廃止ブックの確認
 

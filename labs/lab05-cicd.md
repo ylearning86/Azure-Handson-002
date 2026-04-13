@@ -25,7 +25,6 @@
 - [Step 3: GitHub Actions ワークフローの作成](#step-3-github-actions-ワークフローの作成)
 - [Step 4: CI/CD パイプラインのテスト](#step-4-cicd-パイプラインのテスト)
 - [Step 5: プレビュー環境 (Pull Request 連携)](#step-5-プレビュー環境-pull-request-連携)
-- [Step 6: デプロイ状況の確認](#step-6-デプロイ状況の確認)
 - [セキュリティ補足: CI/CD パイプラインのセキュリティ](#セキュリティ補足-cicd-パイプラインのセキュリティ)
 - [理解度チェック](#理解度チェック)
 
@@ -240,36 +239,57 @@ PR #2         → https://xxx-2.azurestaticapps.net/        (プレビュー)
 - PR をクローズすると**プレビュー環境が自動削除**
 - これが要件の「テスト環境で事前検証後に本番環境にリリース」に対応
 
+**GitHub PR 画面:**
+
+![GitHub PR](../docs/screenshots/lab05/05-github-pr.png)
+
+**Azure Portal の SWA 環境ブレード (Production + プレビュー環境):**
+
+![SWA 環境](../docs/screenshots/lab05/05-swa-environments.png)
+
+**プレビュー環境のブラウザ表示:**
+
+![プレビュー環境](../docs/screenshots/lab05/05-preview-browser.png)
+
 > **注意**: Lab 03 で Private Endpoint を設定済みの場合、プレビュー環境への直接アクセスは 403 になります。
 > プレビュー環境の動作確認は Application Gateway 経由、または Private Endpoint を一時的に無効化して行います。
 
-## Step 6: デプロイ状況の確認
-
-### SWA のデプロイ状態確認
-
-> **注**: FQDN (`${PREFIX}.japaneast.cloudapp.azure.com`) は Lab 03 Step 4 でパブリック IP 作成時に設定済みです。
+### プレビュー環境に直接アクセスする場合 (Private Endpoint の一時無効化)
 
 ```bash
-# SWA のデプロイ履歴
-az staticwebapp show \
+# 1. Private Endpoint を一時的に削除
+az network private-endpoint delete \
+  --name "pe-${PREFIX}-swa" \
+  --resource-group $RG_NAME
+
+# 2. プレビュー環境の URL を確認
+az staticwebapp environment list \
   --name "swa-${PREFIX}" \
   --resource-group $RG_NAME \
-  --query "{name:name, defaultHostname:defaultHostname, branch:branch}" -o json
+  --query "[].{name:buildId, hostname:hostname}" -o table
+
+# 3. ブラウザでプレビュー URL にアクセスして動作確認
+#    例: https://xxx-2.eastasia.7.azurestaticapps.net/
+
+# 4. 確認が終わったら Private Endpoint を再作成
+MSYS_NO_PATHCONV=1 az network private-endpoint create \
+  --name "pe-${PREFIX}-swa" \
+  --resource-group $RG_NAME \
+  --vnet-name "vnet-${PREFIX}-dev" \
+  --subnet snet-pe \
+  --private-connection-resource-id "$(az staticwebapp show \
+    --name "swa-${PREFIX}" \
+    --resource-group $RG_NAME \
+    --query id -o tsv)" \
+  --group-ids staticSites \
+  --connection-name swa-pe-connection
+
+# 5. AGW 経由のアクセスが復旧したことを確認
+curl -sk -o /dev/null -w "HTTP Status: %{http_code}\n" \
+  "https://${PREFIX}.japaneast.cloudapp.azure.com/"
 ```
 
-### ブラウザで動作確認
-
-App Gateway の FQDN 経由でアプリにアクセスし、CI/CD でデプロイされた内容が反映されていることを確認します。
-
-```bash
-echo "ブラウザでアクセス: https://${PREFIX}.japaneast.cloudapp.azure.com/"
-```
-
-> **Note**: 自己署名証明書のため、ブラウザに証明書の警告が表示されます。「詳細設定」→「安全でないページに移動」で続行してください。
-
-![FQDN 経由のブラウザアクセス](../docs/screenshots/lab05/06-app-browser.png)
-
-> **ポイント**: GitHub に push するだけで、SWA が自動ビルド & デプロイし、App Gateway 経由で更新後のアプリにアクセスできます。
+> **注意**: Private Endpoint 削除中は SWA にパブリックからも直接アクセス可能になります。確認後は速やかに再作成してください。
 
 ---
 
