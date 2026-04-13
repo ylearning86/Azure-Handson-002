@@ -7,7 +7,7 @@ module.exports = async function (context, req) {
         headers: { "Content-Type": "application/json" },
         body: {
             service: "サンプル業務システム",
-            version: "v1.0",
+            version: "v1.1",
             environment: process.env.APP_ENV || "production",
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),
