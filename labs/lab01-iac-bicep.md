@@ -51,16 +51,22 @@ Bicep は Azure のリソースを宣言的に定義する Domain-Specific Langu
 
 ## Step 2: ネットワーク基盤の Bicep を作成する
 
-まず、VNet（仮想ネットワーク）を定義します。要件定義の「クラウド上に論理的に隔離された仮想閉域ネットワークを構築」に対応します。
+まず、ハンズオン用のリポジトリを取得します。Bicep テンプレートやサンプルアプリのソースコードが含まれています。
+
+```bash
+# Git clone で取得
+git clone https://github.com/ylearning86/Azure-Handson-002.git
+cd Azure-Handson-002
+```
+
+> **Git が使えない場合**: GitHub の [Code] → [Download ZIP] からダウンロードし、展開してください。  
+> https://github.com/ylearning86/Azure-Handson-002/archive/refs/heads/main.zip
+
+次に、VNet（仮想ネットワーク）を定義します。要件定義の「クラウド上に論理的に隔離された仮想閉域ネットワークを構築」に対応します。
 
 ### ファイル: `infra/modules/network.bicep`
 
-```bash
-# infra/modules ディレクトリに移動
-cd infra && mkdir -p modules
-```
-
-以下の内容でファイルを作成してください。
+`infra/modules/network.bicep` の内容を確認してください。以下のようにネットワーク基盤が定義されています。
 
 ```bicep
 // infra/modules/network.bicep

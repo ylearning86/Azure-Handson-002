@@ -21,11 +21,15 @@
 | **共同作成者** (Contributor) | サブスクリプション | 全 Lab | リソースグループ・各種リソースの作成・削除 |
 | **ユーザーアクセス管理者** (User Access Administrator) | リソースグループ | Lab03 | RBAC ロールの割り当て (Key Vault, Functions 等) |
 
-#### Microsoft Entra ID (ディレクトリロール) ※Lab05 OIDC 認証を使う場合のみ
+#### Microsoft Entra ID (ディレクトリロール)
 
 | 必要な権限 | 使用する Lab | 操作内容 |
 |-----------|-------------|---------|
+| **アプリケーション登録が可能**であること | Lab03 | `az ad app create` (カスタム認証プロバイダー用 Entra ID アプリ登録) |
 | **アプリケーション開発者** (Application Developer) | Lab05 (任意) | `az ad app create`, `az ad sp create`, `az ad app federated-credential create` |
+
+> **Lab03 の補足**: テナント設定で「ユーザーはアプリケーションを登録できる」が「はい」(デフォルト) であれば追加ロール不要です。「いいえ」の場合は **アプリケーション管理者** または **クラウドアプリケーション管理者** ロールが必要です。  
+> 確認方法: Azure Portal → Microsoft Entra ID → ユーザー設定 → 「アプリの登録」
 
 ### 推定コスト
 
@@ -97,13 +101,13 @@
 | Lab | タイトル | 対応する非機能要件 | 主な Azure サービス | 対応する AWS サービス |
 |-----|----------|-------------------|-------------------|---------------------|
 | [00](labs/lab00-setup.md) | 事前準備 | - | Azure CLI, Bicep, VS Code | AWS CLI, CloudFormation, VS Code |
-| [01](labs/lab01-iac-bicep.md) | Bicep による基盤構築 | 3.2 IaC, 3.11 稼働環境 | Bicep, Resource Group, VNet | CloudFormation, Resource Groups, VPC |
-| [02](labs/lab02-swa-serverless.md) | Static Web Apps & サーバレス API | 3.2 クラウドネイティブ, 3.6 拡張性 | Static Web Apps, Azure Functions | Amplify Hosting, Lambda |
-| [03](labs/lab03-security.md) | ゼロトラスト セキュリティ | 3.10 セキュリティ | **Application Gateway + WAF**, Key Vault, NSG, Entra ID, Defender | **ALB + AWS WAF**, Secrets Manager, Security Groups, IAM Identity Center, GuardDuty |
-| [04](labs/lab04-monitoring.md) | 監視・可用性・自動復旧 | 3.5 信頼性, 3.4 性能 | Monitor, Log Analytics, Application Insights, Alerts | CloudWatch, CloudWatch Logs, X-Ray, CloudWatch Alarms |
-| [05](labs/lab05-cicd.md) | SWA 組込み CI/CD | 3.2 CI/CD | SWA CLI, GitHub Actions | Amplify CLI, GitHub Actions |
-| [06](labs/lab06-backup-dr.md) | バックアップ & DR | 3.9 継続性 | Azure Backup, Geo-replication, PITR | AWS Backup, Cross-Region Replication, RDS PITR |
-| [07](labs/lab07-cost-management.md) | コスト管理・最適化 | 3.3 コスト管理 | Cost Management, Advisor, Budgets | Cost Explorer, Trusted Advisor, AWS Budgets |
+| [01](labs/lab01-iac-bicep.md) | Bicep による基盤構築 | IaC, 稼働環境 | Bicep, Resource Group, VNet | CloudFormation, Resource Groups, VPC |
+| [02](labs/lab02-swa-serverless.md) | Static Web Apps & サーバレス API | クラウドネイティブ, 拡張性 | Static Web Apps, Azure Functions | Amplify Hosting, Lambda |
+| [03](labs/lab03-security.md) | ゼロトラスト セキュリティ | セキュリティ | **Application Gateway + WAF**, Key Vault, NSG, Entra ID, Defender | **ALB + AWS WAF**, Secrets Manager, Security Groups, IAM Identity Center, GuardDuty |
+| [04](labs/lab04-monitoring.md) | 監視・可用性・自動復旧 | 信頼性, 性能 | Monitor, Log Analytics, Application Insights, Alerts | CloudWatch, CloudWatch Logs, X-Ray, CloudWatch Alarms |
+| [05](labs/lab05-cicd.md) | SWA 組込み CI/CD | CI/CD | SWA CLI, GitHub Actions | Amplify CLI, GitHub Actions |
+| [06](labs/lab06-backup-dr.md) | バックアップ & DR | 継続性 | Azure Backup, Geo-replication, PITR | AWS Backup, Cross-Region Replication, RDS PITR |
+| [07](labs/lab07-cost-management.md) | コスト管理・最適化 | コスト管理 | Cost Management, Advisor, Budgets | Cost Explorer, Trusted Advisor, AWS Budgets |
 
 ---
 

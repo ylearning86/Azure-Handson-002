@@ -29,7 +29,7 @@
 - [Step 6: SWA にフロントエンドをデプロイ](#step-6-swa-にフロントエンドをデプロイ)
 - [Step 7: Linked Backend 経由の動作確認](#step-7-linked-backend-経由の動作確認)
 - [Step 8: 組込み認証 (Easy Auth) の設定](#step-8-組込み認証-easy-auth-の設定)
-- [Step 9: ローカル開発 (SWA CLI + Functions)](#step-9-ローカル開発-swa-cli--functions)
+- [Step 9: ローカル開発 (SWA CLI + Functions) — オプション](#step-9-ローカル開発-swa-cli--functions--オプション)
 - [理解度チェック](#理解度チェック)
 
 ---
@@ -157,6 +157,16 @@ az functionapp identity show \
 
 ## Step 4: Functions App に API コードをデプロイ
 
+### API エンドポイントの役割
+
+| エンドポイント | 役割 | 認証 |
+|----------------|------|------|
+| `/api/health` | 死活監視用ヘルスチェック。サービス名・タイムスタンプを返す | 不要 (anonymous) |
+| `/api/status` | システム構成情報。バージョン・コンポーネント一覧を返す | 必要 (authenticated) |
+| `/api/infra` | インフラダッシュボード。各 Azure リソースの接続状態を確認 | 不要 (anonymous) |
+
+### デプロイ
+
 ```bash
 # Azure Functions Core Tools でデプロイ
 cd src/api
@@ -172,6 +182,8 @@ FUNC_URL=$(az functionapp show \
 echo "Functions URL: https://${FUNC_URL}"
 curl -s "https://${FUNC_URL}/api/health"
 ```
+
+> **WSL の場合**: Azure Functions Core Tools は WSL (Ubuntu) でも動作します。インストール: `npm install -g azure-functions-core-tools@4 --unsafe-perm true`
 
 **Azure Portal での確認**: Functions App の関数一覧で `health` と `status` が表示されればデプロイ成功です。
 
@@ -206,6 +218,10 @@ echo "SWA の /api/* は func-${PREFIX}-api に転送されます"
 
 > **ポイント**: Linked Backend を設定すると、SWA の `/api/*` へのリクエストが自動的に単体 Functions App に転送されます。フロントエンドからは同一ドメインの `/api/health` としてアクセスでき、CORS の問題も発生しません。
 
+**Azure Portal での確認**: SWA の API ブレードで Linked Backend が設定されていることを確認します。
+
+![Linked Backend 設定](../docs/screenshots/lab02/05-linked-backend-api.png)
+
 ## Step 6: SWA にフロントエンドをデプロイ
 
 ```bash
@@ -222,6 +238,10 @@ swa deploy \
   --env production
 cd ..
 ```
+
+**Azure Portal での確認**: SWA の環境画面で「実稼働」環境にデプロイされていることを確認します。
+
+![デプロイ完了](../docs/screenshots/lab02/07-swa-deploy.png)
 
 ## Step 7: Linked Backend 経由の動作確認
 
@@ -243,7 +263,7 @@ curl -s "https://${FUNC_URL}/api/health" | python -m json.tool
 
 両方とも同じレスポンスが返れば Linked Backend が正常に動作しています。
 
-**Azure Portal での確認**: SWA の概要画面で Standard プランと Linked Backend の設定を確認します。
+**Azure Portal での確認**: SWA の API ブレードで Linked Backend のリンク状態を確認します。
 
 ![Linked Backend](../docs/screenshots/lab02/04-linked-backend.png)
 
@@ -290,7 +310,15 @@ cd ..
 echo "https://${SWA_URL} をブラウザで開いて認証フローを確認してください"
 ```
 
-## Step 9: ローカル開発 (SWA CLI + Functions)
+**ブラウザでの確認**: `https://<SWA のホスト名>` にアクセスし、「Entra ID でログイン」ボタンを押すと、Easy Auth により Entra ID のサインイン画面にリダイレクトされます。ログイン後はアプリに戻り、認証済み状態で API にアクセスできるようになります。
+
+![Easy Auth 認証画面](../docs/screenshots/lab02/08-easy-auth-login.png)
+
+## Step 9: ローカル開発 (SWA CLI + Functions) — オプション
+
+> **この Step はオプションです。** 時間があれば実施してください。
+
+実務では、コード変更のたびに Azure にデプロイして確認するのは非効率です。`swa start` を使うと、Linked Backend 構成をローカルでエミュレートし、フロントエンド + API をまとめて動作確認できます。Lab05 の CI/CD と組み合わせると「ローカル開発 → push → 自動デプロイ」のフローが完成します。
 
 ```bash
 # ローカルでの起動
@@ -301,6 +329,8 @@ swa start web --api-location api
 # ブラウザで http://localhost:4280 にアクセス
 # API は http://localhost:4280/api/health でアクセス可能
 ```
+
+> **WSL の場合**: `swa start` は WSL でも動作します。ブラウザは Windows 側で `http://localhost:4280` を開いてください。
 
 ---
 

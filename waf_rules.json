@@ -1,0 +1,10 @@
+{
+  "exclusions": [],
+  "managedRuleSets": [
+    {
+      "ruleGroupOverrides": [],
+      "ruleSetType": "Microsoft_DefaultRuleSet",
+      "ruleSetVersion": "2.1"
+    }
+  ]
+}

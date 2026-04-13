@@ -17,6 +17,20 @@
 
 ---
 
+## 推奨環境
+
+本ハンズオンのコマンドはすべて **bash** 前提で記述されています。以下のいずれかの環境で実施できます。
+
+| 環境 | 対応状況 | 備考 |
+|------|----------|------|
+| **WSL (Ubuntu)** | 推奨 | Linux コマンドがネイティブで動作。パス変換問題が起きない |
+| **Git Bash (Windows)** | 対応 | MSYS パス変換に注意 (`MSYS_NO_PATHCONV=1` が必要な箇所あり) |
+| **macOS / Linux** | 対応 | そのまま実行可能 |
+
+> **WSL を使用する場合**: VS Code の **Remote - WSL 拡張** (`ms-vscode-remote.remote-wsl`) をインストールすると、WSL 内のファイルを直接編集できます。`az login` は WSL からでも Windows 側のブラウザが起動します。
+
+---
+
 ## 必要なツール
 
 | ツール | バージョン | 用途 |
@@ -96,6 +110,8 @@ echo "LOCATION: $LOCATION"
 > $LOCATION = "japaneast"
 > $PREFIX = "sampleapp$(Get-Random -Minimum 100 -Maximum 999)"
 > ```
+
+> **注意**: 変数はターミナルセッションごとにリセットされます。新しいターミナルを開いた場合や、翌日に作業を再開する場合は、上記の `export` コマンドを再実行してください。
 
 ## Step 4: リソースグループの作成
 

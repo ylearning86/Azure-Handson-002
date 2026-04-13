@@ -1,87 +1,161 @@
 <!-- src/web/index.html -->
-<!-- サンプル業務システム ハンズオン: フロントエンド -->
+<!-- サンプル業務システム ハンズオン: フロントエンド + インフラダッシュボード -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>サンプル業務システム v2 (ハンズオン)</title>
+  <title>サンプル業務システム (ハンズオン)</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
-    h1 { color: #0078d4; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 16px 0; }
-    .status { color: #107c10; font-weight: bold; }
-    .error { color: #d13438; font-weight: bold; }
-    button { background: #0078d4; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 4px; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; max-width: 960px; margin: 40px auto; padding: 0 20px; color: #333; }
+    h1 { color: #0078d4; margin-bottom: 4px; }
+    h2 { margin-top: 0; color: #444; }
+    .subtitle { color: #666; margin-bottom: 24px; }
+    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 16px 0; background: #fff; }
+    .card h2 { font-size: 1.1em; margin-bottom: 12px; }
+    .status-ok { color: #107c10; font-weight: bold; }
+    .status-warn { color: #ca5010; font-weight: bold; }
+    .status-err { color: #d13438; font-weight: bold; }
+    .status-info { color: #0078d4; }
+    button { background: #0078d4; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 4px 4px 4px 0; font-size: 0.9em; }
     button:hover { background: #106ebe; }
-    pre { background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; }
+    button.secondary { background: #fff; color: #0078d4; border: 1px solid #0078d4; }
+    button.secondary:hover { background: #f0f6ff; }
+    pre { background: #f8f8f8; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 0.85em; max-height: 300px; overflow-y: auto; }
+    /* インフラカード */
+    .infra-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .infra-item { border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px; background: #fafafa; }
+    .infra-item h3 { margin: 0 0 6px; font-size: 0.95em; color: #0078d4; }
+    .infra-item .type { font-size: 0.8em; color: #888; margin-bottom: 8px; }
+    .infra-item .detail { font-size: 0.85em; line-height: 1.6; }
+    .infra-item .badge { display: inline-block; font-size: 0.7em; padding: 2px 6px; border-radius: 3px; margin-left: 4px; }
+    .badge-ok { background: #dff6dd; color: #107c10; }
+    .badge-warn { background: #fff4ce; color: #ca5010; }
+    .badge-err { background: #fde7e9; color: #d13438; }
+    .badge-lab { background: #e8f0fe; color: #0078d4; }
+    .flex-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <h1>サンプル業務システム v2</h1>
-  <p>Azure Static Web Apps ハンズオン用サンプルアプリケーション (CI/CD でデプロイ済み)</p>
+  <h1>サンプル業務システム</h1>
+  <p class="subtitle">Azure ハンズオンで構築したクラウドネイティブアーキテクチャ</p>
 
+  <!-- 認証情報 -->
   <div class="card">
-    <h2>システムステータス</h2>
-    <p>API 状態: <span id="api-status">確認中...</span></p>
-    <button onclick="checkHealth()">ヘルスチェック実行</button>
-    <button onclick="checkStatus()">ステータス取得</button>
-    <pre id="api-response"></pre>
+    <h2>認証情報 (Easy Auth + カスタム Entra ID)</h2>
+    <div class="flex-row">
+      <span>ログイン状態: <span id="auth-status">確認中...</span></span>
+      <button onclick="location.href='/.auth/login/aad'">Entra ID でログイン</button>
+      <button class="secondary" onclick="location.href='/.auth/logout'">ログアウト</button>
+    </div>
+    <pre id="auth-info" style="display:none;"></pre>
   </div>
 
+  <!-- システムステータス -->
   <div class="card">
-    <h2>認証情報 (Easy Auth)</h2>
-    <p>ログイン状態: <span id="auth-status">確認中...</span></p>
-    <button onclick="location.href='/.auth/login/aad'">Entra ID でログイン</button>
-    <button onclick="location.href='/.auth/logout'">ログアウト</button>
-    <pre id="auth-info"></pre>
+    <h2>システムステータス</h2>
+    <div class="flex-row">
+      <span>API: <span id="api-status">確認中...</span></span>
+      <button onclick="checkHealth()">ヘルスチェック</button>
+    </div>
+    <pre id="api-response" style="display:none;"></pre>
+  </div>
+
+  <!-- インフラダッシュボード -->
+  <div class="card">
+    <h2>インフラダッシュボード</h2>
+    <p style="font-size:0.85em;color:#666;">ハンズオンで構築した Azure リソースの接続状態</p>
+    <div id="infra-loading" style="color:#888;">読み込み中...</div>
+    <div id="infra-grid" class="infra-grid" style="display:none;"></div>
+    <button onclick="checkInfra()" style="margin-top:8px;">再チェック</button>
   </div>
 
   <script>
-    // API ヘルスチェック
+    // --- ヘルスチェック ---
     async function checkHealth() {
+      const el = document.getElementById('api-status');
+      const pre = document.getElementById('api-response');
       try {
         const res = await fetch('/api/health');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        document.getElementById('api-status').textContent = data.status;
-        document.getElementById('api-status').className = 'status';
-        document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+        el.textContent = data.status === 'healthy' ? '正常稼働' : data.status;
+        el.className = data.status === 'healthy' ? 'status-ok' : 'status-warn';
+        pre.textContent = JSON.stringify(data, null, 2);
+        pre.style.display = 'block';
       } catch (e) {
-        document.getElementById('api-status').textContent = 'エラー: ' + e.message;
-        document.getElementById('api-status').className = 'error';
+        el.textContent = 'エラー: ' + e.message;
+        el.className = 'status-err';
+        pre.textContent = '';
+        pre.style.display = 'none';
       }
     }
 
-    // ステータス取得
-    async function checkStatus() {
+    // --- インフラダッシュボード ---
+    async function checkInfra() {
+      const grid = document.getElementById('infra-grid');
+      const loading = document.getElementById('infra-loading');
+      loading.style.display = 'block';
+      grid.style.display = 'none';
       try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/infra');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+        grid.innerHTML = '';
+        // 各コンポーネントをカードで表示
+        for (const [key, comp] of Object.entries(data.components)) {
+          const dnsOk = comp.dns === 'resolved';
+          const statusOk = comp.status === 'running' || comp.status === 'deployed' || dnsOk;
+          const badgeClass = statusOk ? 'badge-ok' : 'badge-err';
+          const badgeText = statusOk ? '接続OK' : '未接続';
+          // Lab バッジ
+          const labBadges = (comp.labs || []).map(l =>
+            `<span class="badge badge-lab">${l}</span>`).join('');
+          const item = document.createElement('div');
+          item.className = 'infra-item';
+          item.innerHTML = `
+            <h3>${comp.name} <span class="badge ${badgeClass}">${badgeText}</span> ${labBadges}</h3>
+            <div class="type">${comp.type}</div>
+            <div class="detail">
+              ${comp.host ? `ホスト: <code>${comp.host}</code><br>` : ''}
+              ${comp.runtime ? `ランタイム: ${comp.runtime}<br>` : ''}
+              ${comp.purpose ? `用途: ${comp.purpose}` : ''}
+            </div>`;
+          grid.appendChild(item);
+        }
+        loading.style.display = 'none';
+        grid.style.display = 'grid';
       } catch (e) {
-        document.getElementById('api-response').textContent = 'エラー: ' + e.message;
+        loading.textContent = 'インフラ情報の取得に失敗: ' + e.message;
       }
     }
 
-    // 認証情報の取得 (SWA Easy Auth)
+    // --- 認証チェック ---
     async function checkAuth() {
       try {
         const res = await fetch('/.auth/me');
         const data = await res.json();
         if (data.clientPrincipal) {
-          document.getElementById('auth-status').textContent = 'ログイン済み (' + data.clientPrincipal.userDetails + ')';
-          document.getElementById('auth-status').className = 'status';
-          document.getElementById('auth-info').textContent = JSON.stringify(data.clientPrincipal, null, 2);
+          document.getElementById('auth-status').textContent =
+            'ログイン済み (' + data.clientPrincipal.userDetails + ')';
+          document.getElementById('auth-status').className = 'status-ok';
+          const pre = document.getElementById('auth-info');
+          pre.textContent = JSON.stringify(data.clientPrincipal, null, 2);
+          pre.style.display = 'block';
         } else {
           document.getElementById('auth-status').textContent = '未ログイン';
+          document.getElementById('auth-status').className = 'status-info';
         }
       } catch (e) {
         document.getElementById('auth-status').textContent = '確認不可';
+        document.getElementById('auth-status').className = 'status-warn';
       }
     }
 
-    // 初期化
+    // --- 初期化 ---
     checkHealth();
+    checkInfra();
     checkAuth();
   </script>
 </body>

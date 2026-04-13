@@ -1,5 +1,27 @@
 {
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/2ed3a4f8-f28c-48e5-b7c0-988a1423a7c0/v2.0",
+          "clientIdSettingName": "AZURE_CLIENT_ID",
+          "clientSecretSettingName": "AZURE_CLIENT_SECRET"
+        }
+      }
+    }
+  },
+  "forwardingGateway": {
+    "allowedForwardedHosts": ["sampleapp542.japaneast.cloudapp.azure.com"]
+  },
   "routes": [
+    {
+      "route": "/api/health",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/api/infra",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
     {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
