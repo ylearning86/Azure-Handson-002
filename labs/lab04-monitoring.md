@@ -58,7 +58,7 @@ echo "Application Insights の接続文字列を SWA に設定しました"
 
 ![Application Insights 概要](../docs/screenshots/lab04/01-appinsights-overview.png)
 
-**確認 2**: Azure Portal の Application Insights → **ログ** で以下の KQL を実行し、`compliance_rate` が **80以上** であることを確認します。
+**確認 2**: Azure Portal の **Log Analytics ワークスペース** (`law-${PREFIX}-dev`) → **ログ** で以下の KQL を実行し、`compliance_rate` が **80以上** であることを確認します。
 
 > **補足**: データが少ない場合は、先にアプリへ数回アクセスしてリクエストを発生させてから実行してください。
 
