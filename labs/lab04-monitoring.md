@@ -26,7 +26,7 @@
 - [Step 3: SWA の可用性確認](#step-3-swa-の可用性確認)
 - [Step 4: Log Analytics でクエリを実行](#step-4-log-analytics-でクエリを実行)
 - [Step 5: Azure ダッシュボードの作成](#step-5-azure-ダッシュボードの作成)
-- [Step 6: サービス正常性アラートの設定](#step-6-サービス正常性アラートの設定)
+- [Step 6: Advisor サービス廃止ブックの確認](#step-6-advisor-サービス廃止ブックの確認)
 - [理解度チェック](#理解度チェック)
 
 ---
@@ -54,9 +54,26 @@ az staticwebapp appsettings set \
 echo "Application Insights の接続文字列を SWA に設定しました"
 ```
 
-**確認**: Azure Portal で Application Insights の概要を確認できます。
+**確認 1**: Azure Portal で Application Insights の概要を確認できます。
 
 ![Application Insights 概要](../docs/screenshots/lab04/01-appinsights-overview.png)
+
+**確認 2**: Azure Portal の Application Insights → **ログ** で以下の KQL を実行し、`compliance_rate` が **80以上** であることを確認します。
+
+> **補足**: データが少ない場合は、先にアプリへ数回アクセスしてリクエストを発生させてから実行してください。
+
+```kql
+// 要件: レスポンスタイム遵守率 (目標80%)
+AppRequests
+| where TimeGenerated > ago(1h)
+| summarize
+    total = count(),
+    within_sla = countif(DurationMs <= 5000)  // 5秒以内
+| extend compliance_rate = round(100.0 * within_sla / total, 1)
+| project total, within_sla, compliance_rate
+```
+
+**期待値**: `compliance_rate >= 80`
 
 ## Step 2: アラートルールの作成
 
@@ -115,25 +132,31 @@ MSYS_NO_PATHCONV=1 az monitor metrics alert create \
 
 要件: 「SPOF を極力排除」「障害が発生したコンポーネントを切り離し」
 
+> **ポイント**: SWA はグローバルに分散された CDN でホスティングされ、単一障害点が排除されています。  
+> Functions もマネージド環境で自動的に復旧されます。  
+
+### Azure サービス正常性の確認
+
+要件: 「クラウドサービスの機能や性能に変更が発生した場合、影響を確認」
+
+可用性はアプリ側だけでなく、**基盤となる Azure サービス自体の正常性**も確認する必要があります。
+
 ```bash
-# SWA のデプロイ状態を確認
-az staticwebapp show \
-  --name "swa-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --query "{name:name, defaultHostname:defaultHostname, sku:sku.name}" -o json
-
-# SWA のヘルスチェック (Lab 03 で WAF を設定済みのため、SWA 直接アクセスは 403 になります)
-SWA_URL=$(az staticwebapp show \
-  --name "swa-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --query "defaultHostname" -o tsv)
-
-curl -s "https://${SWA_URL}/api/health" | python -m json.tool || echo "WAF により直接アクセスはブロックされています (Lab 03 で設定済み)"
+# 利用中のサービス (Static Web Apps, Functions, Application Gateway) に
+# 現在アクティブなインシデントやメンテナンスがないか確認
+az rest --method GET \
+  --url "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/providers/Microsoft.ResourceHealth/events?api-version=2024-02-01&\$filter=eventType eq 'ServiceIssue' or eventType eq 'PlannedMaintenance'" \
+  --query "value[?status.value=='Active'].[eventType, title, summary, status.value]" \
+  -o table 2>/dev/null || echo "現在アクティブなサービス正常性イベントはありません"
 ```
 
-> **ポイント**: SWA はグローバルに分散された CDN でホスティングされ、単一障害点が排除されています。  
-> Managed Functions もマネージド環境で自動的に復旧されます。  
-> Lab 03 で WAF を設定済みのため、SWA への直接アクセスは 403 が返ります。Application Gateway 経由でのアクセスが正規ルートです。
+**確認**: Azure Portal → **[サービス正常性](https://portal.azure.com/#blade/Microsoft_Azure_Health/AzureHealthBrowseBlade/serviceIssues)** でも同様の情報を確認できます。
+
+![サービス正常性](../docs/screenshots/lab04/03-service-health.png)
+
+> **ポイント**: サービス正常性の確認は障害発生時の初動対応として重要です。  
+> アプリのエラーが Azure 側の障害に起因するかを切り分ける際に活用します。  
+> Step 6 では、これを**自動通知**するアラートを設定します。
 
 ## Step 4: Log Analytics でクエリを実行
 
@@ -166,17 +189,6 @@ requests
 | render timechart
 ```
 
-```kql
-// 要件: レスポンスタイム遵守率 (目標80%)
-requests
-| where timestamp > ago(1h)
-| summarize
-    total = count(),
-    within_sla = countif(duration <= 5000)  // 5秒以内
-| extend compliance_rate = round(100.0 * within_sla / total, 1)
-| project total, within_sla, compliance_rate
-```
-
 ## Step 5: Azure ダッシュボードの作成
 
 要件: 「ダッシュボード等による状況の可視化」
@@ -197,23 +209,27 @@ echo "   - リソースグループ → リソース一覧"
 echo "4. 「保存」をクリック"
 ```
 
-## Step 6: サービス正常性アラートの設定
+## Step 6: Advisor サービス廃止ブックの確認
 
 要件: 「クラウドサービスの機能や性能に変更が発生した場合、影響を確認」
 
-```bash
-# Azure サービス正常性アラート (Japan East リージョン)
-az monitor activity-log alert create \
-  --name "alert-service-health" \
-  --resource-group $RG_NAME \
-  --condition category=ServiceHealth \
-  --action-group "ag-handson-ops" \
-  --description "Azure サービスの障害・メンテナンス通知"
-```
+Azure サービスは段階的に廃止・移行されることがあります。**Advisor のサービス廃止ブック**で、利用中のリソースに影響する廃止予定を事前に把握できます。
 
-**確認**: サービス正常性アラートがアクティビティログアラートルールとして作成されます。
+### 確認手順
 
-![サービス正常性アラート](../docs/screenshots/lab04/05-service-health-alert.png)
+1. Azure Portal → **[Advisor](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/overview)** を開く
+2. 左メニューの **「Workbooks」** をクリック
+3. **「サービス廃止ブック」** (Service Retirement) を選択
+4. ビューの選択で **「Impacted Services」** タブを確認
+5. サブスクリプション・リソースグループ・場所でフィルタリングし、影響を受けるサービスを特定
+
+**確認**: 廃止予定のサービスと影響を受けるリソース数が一覧表示されます。
+
+![Advisor サービス廃止ブック](../docs/screenshots/lab04/05-advisor-service-retirement.png)
+
+> **ポイント**: 廃止日の横にある赤い色のアイコンは、既に廃止済みまたは廃止が間近であることを示します。  
+> 「アクション」列の「詳細情報」リンクから、移行手順のドキュメントを確認できます。  
+> このブックを定期的に確認することで、廃止に伴うサービス中断を未然に防げます。
 
 ---
 
@@ -224,6 +240,7 @@ az monitor activity-log alert create \
 - [ ] Log Analytics で KQL クエリを実行しログを分析した
 - [ ] 要件定義の「稼働率」「レスポンスタイム」がどう監視されるか理解した
 - [ ] SWA のグローバル分散による可用性確保の仕組みを理解した
+- [ ] Advisor サービス廃止ブックで影響のあるサービスを確認した
 
 ### 要件 → Azure 実装の対応表
 
@@ -235,7 +252,7 @@ az monitor activity-log alert create \
 | ダッシュボード可視化 | Azure ダッシュボード + Application Insights |
 | 障害検知と自動通知 | アラートルール + アクショングループ |
 | SPOF 排除 | SWA グローバル CDN + Functions 自動復旧 |
-| クラウドサービス変更の検知 | Azure サービス正常性アラート |
+| クラウドサービス変更の検知 | Advisor サービス廃止ブック + サービス正常性 |
 
 ---
 
