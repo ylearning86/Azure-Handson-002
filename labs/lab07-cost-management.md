@@ -22,97 +22,67 @@
 
 - [Step 1: 現在のコストを確認](#step-1-現在のコストを確認)
 - [Step 2: 予算アラートの設定](#step-2-予算アラートの設定)
-- [Step 3: Azure Advisor でコスト最適化推奨を確認](#step-3-azure-advisor-でコスト最適化推奨を確認)
+- [Step 3: コスト最適化のベストプラクティス確認](#step-3-コスト最適化のベストプラクティス確認)
 - [Step 4: リソースのタグ付けによるコスト管理](#step-4-リソースのタグ付けによるコスト管理)
-- [Step 5: コスト最適化のベストプラクティス確認](#step-5-コスト最適化のベストプラクティス確認)
-- [Step 6: ポータルでコスト分析を確認](#step-6-ポータルでコスト分析を確認)
+- [Step 5: コスト異常検出の確認](#step-5-コスト異常検出の確認)
 - [理解度チェック](#理解度チェック)
 
 ---
 
 ## Step 1: 現在のコストを確認
 
-```bash
-# リソースグループのコスト概要を確認
-az consumption usage list \
-  --query "[?contains(instanceName, '${PREFIX}')].{name:instanceName, cost:pretaxCost, currency:currency}" \
-  -o table 2>/dev/null || echo "コストデータは翌日以降に反映されます"
+1. Azure Portal → **Cost Management** → **コスト分析**
+2. スコープ: サブスクリプション (例: `sub-handson-002`)
+3. フィルター: **Resource group name = rg-handson-v4** を追加
+4. 以下を確認:
+   - **累積コスト**: 月初からの合計コスト
+   - **毎月の予算**: 予算ライン (赤い点線)
+   - **Service name 別**: どのサービスにいくらかかっているか
+   - **Location 別**: リージョンごとのコスト
+   - **Resource group name 別**: リソースグループ単位のコスト
 
-# リソースグループ内のリソース一覧 (課金対象の確認)
-az resource list \
-  --resource-group $RG_NAME \
-  --query "[].{name:name, type:type, sku:sku.name}" \
-  -o table
-```
+![コスト分析](../docs/screenshots/lab07/01-rg-resources.png)
+
+> **注意**: コストデータは翌日以降に反映されます。リソース作成直後は $0 と表示される場合があります。
 
 ## Step 2: 予算アラートの設定
 
 要件: 「コスト超過することがないよう、閾値を超えた場合のアラート処理等の仕組みを設けること」
 
-```bash
-# 月次予算の作成 (例: 10,000円 ≒ $70)
-# 要件: 利用予定範囲（コスト）を超過しないよう監視
-az consumption budget create \
-  --budget-name "budget-handson-v4" \
-  --resource-group $RG_NAME \
-  --amount 70 \
-  --category cost \
-  --time-grain monthly \
-  --start-date "$(date +%Y-%m)-01" \
-  --end-date "2027-03-31" \
-  --notifications "{
-    \"Actual_GreaterThan_80_Percent\": {
-      \"enabled\": true,
-      \"operator\": \"GreaterThan\",
-      \"threshold\": 80,
-      \"contactEmails\": [\"ops@example.com\"],
-      \"thresholdType\": \"Actual\"
-    },
-    \"Forecasted_GreaterThan_100_Percent\": {
-      \"enabled\": true,
-      \"operator\": \"GreaterThan\",
-      \"threshold\": 100,
-      \"contactEmails\": [\"ops@example.com\"],
-      \"thresholdType\": \"Forecasted\"
-    }
-  }" 2>/dev/null || echo "予算作成にはポータルを使用してください"
-```
-
-### ポータルでの予算設定手順
-
-1. Azure Portal → **Cost Management + Billing**
-2. **予算** → **追加**
-3. 以下を設定:
+1. Azure Portal → **Cost Management** → **予算** → **追加**
+2. 以下を設定:
    - スコープ: `rg-handson-v4`
    - 予算名: `budget-handson-v4`
    - リセット期間: `月次`
    - 金額: `70 USD` (約10,000円)
-4. アラート条件:
-   - 実績が80%に達したら通知
-   - 予測が100%を超えたら通知
+3. アラート条件:
+   - **実績**が **80%** に達したら通知
+   - **予測**が **100%** を超えたら通知
+4. 通知先メールアドレスを設定
 
-## Step 3: Azure Advisor でコスト最適化推奨を確認
+![予算アラート設定](../docs/screenshots/lab07/02-budget.png)
+
+## Step 3: コスト最適化のベストプラクティス確認
 
 要件: 「リソース利用状況に基づいたリソース見直し」
 
-```bash
-# Advisor のコスト推奨事項を確認
-az advisor recommendation list \
-  --category cost \
-  --query "[].{category:category, impact:impact, description:shortDescription.problem}" \
-  -o table
+1. Azure Portal → **Advisor** → **コスト**
+2. 推奨事項を確認:
+   - **オンデマンドのコスト削減**: 未使用リソースの削除、SKU のダウンサイジング
+   - **節約プランの購入**: リザーブドインスタンス、Savings Plans の推奨
+3. 影響度 (高/中/低) と削減可能額を確認
 
-# すべてのカテゴリの推奨事項
-az advisor recommendation list \
-  --query "[].{category:category, impact:impact, problem:shortDescription.problem}" \
-  -o table
-```
+![Advisor コスト推奨](../docs/screenshots/lab07/03-advisor-recommendations.png)
 
 > **Advisor が提案する主なコスト最適化**:
+>
 > - 未使用リソースの削除
 > - SKU のダウンサイジング
 > - リザーブドインスタンスの推奨
 > - 停止可能なリソースの特定
+>
+> **参考**: [Azure Advisor のコストの推奨事項](https://learn.microsoft.com/ja-jp/azure/advisor/advisor-reference-cost-recommendations)
+
 
 ## Step 4: リソースのタグ付けによるコスト管理
 
@@ -133,67 +103,25 @@ az group update \
 az group show --name $RG_NAME --query tags -o json
 ```
 
-タグは Cost Management のフィルタに使用でき、プロジェクト別/環境別のコスト分析が可能になります。
+![RG タグ設定](../docs/screenshots/lab07/04-rg-tags.png)
 
-## Step 5: コスト最適化のベストプラクティス確認
+タグは Cost Management のフィルタに使用でき、プロジェクト別/環境別のコスト分析が可能になります。Step 1 のコスト分析画面で「フィルターの追加」からタグ (`environment=dev` など) で絞り込んでみましょう。
 
-以下は要件定義書の各記載に対するAzureでの実装方針です:
+## Step 5: コスト異常検出の確認
 
-### サーバレス / 従量課金の活用
+要件: 「コスト超過を防止する監視・アラートの仕組み」
 
-```bash
-# Azure Functions の課金プラン確認 (Consumption = 従量課金)
-az functionapp show \
-  --name "func-${PREFIX}-api" \
-  --resource-group $RG_NAME \
-  --query "{name:name, kind:kind, sku:sku}" -o json 2>/dev/null || echo "Functions 未作成の場合はスキップ"
+Azure Cost Management には、機械学習ベースの**コスト異常検出 (Anomaly Detection)** 機能があります。過去の使用パターンから逸脱する予期しないコスト増加を自動的に検出し、アラートで通知できます。
 
-# Static Web Apps の SKU 確認
-az staticwebapp show \
-  --name "swa-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --query "{name:name, sku:sku.name, defaultHostname:defaultHostname}" -o json 2>/dev/null || echo "SWA 未作成の場合はスキップ"
-```
+1. Azure Portal → **Cost Management** → **コスト分析**
+2. ビューを「**スマート ビュー**」に切り替え → 異常が検出されている場合はグラフ上にマーク表示
+3. **コスト アラート** → **追加** → 「**異常アラート**」を選択して異常検出時の通知を設定
 
-### リソースのサイジング確認
+![コストアラート](../docs/screenshots/lab07/05-cost-alerts.png)
 
-```bash
-echo "=========================================="
-echo "コスト最適化チェックリスト"
-echo "=========================================="
-echo ""
-echo "[サーバレス / 従量課金]"
-echo "  - Azure Functions: Consumption プラン → 実行時間のみ課金"
-echo "  - Static Web Apps: Free プランあり → 開発・テストは無料"
-echo ""
-echo "[ストレージ最適化]"
-echo "  - ライフサイクル管理: Hot → Cool → Archive 自動移行"
-echo "  - GRS vs LRS: 重要度に応じて選択"
-echo ""
-echo "[データベース最適化]"
-echo "  - Burstable (開発) vs General Purpose (本番)"
-echo "  - ストレージの自動拡張を有効化し、余剰確保を回避"
-echo ""
-echo "[予約割引]"
-echo "  - Reservations: 1年/3年の事前コミットで最大65%割引"
-echo "  - Savings Plans: コンピューティング全般に適用可能"
-```
-
-## Step 6: ポータルでコスト分析を確認
-
-```bash
-echo "=========================================="
-echo "Azure Portal でコスト分析を確認してください"
-echo "=========================================="
-echo ""
-echo "1. Azure Portal → Cost Management → コスト分析"
-echo "2. スコープ: rg-handson-v4"
-echo "3. 以下の軸で分析:"
-echo "   - サービス名別 (どのサービスにいくらかかっているか)"
-echo "   - リソース別 (個別リソースのコスト)"
-echo "   - タグ別 (environment=dev のコスト)"
-echo "4. 「累計コスト」と「日次コスト」のグラフを確認"
-```
+> **ポイント**: 予算アラート (Step 2) は「設定した閾値を超えたら通知」ですが、異常検出は**過去のパターンから逸脱した予期しないコスト増加**を AI が自動判定して通知します。両方を組み合わせることで、想定内の超過と想定外の異常の両方を検知できます。
+>
+> **参考**: [予期しない料金を分析する - 異常アラートの作成](https://learn.microsoft.com/ja-jp/azure/cost-management-billing/understand/analyze-unexpected-charges#create-an-anomaly-alert)
 
 ---
 

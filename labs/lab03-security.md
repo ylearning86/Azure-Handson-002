@@ -75,6 +75,23 @@ graph LR
 
 要件: 「パブリックインターネットからの直接アクセスを遮断」
 
+Private Endpoint (PE) は VNet 内に NIC (プライベート IP) を作成し、PaaS サービスへの接続を VNet 内に閉じる仕組みです。PE へのアクセスは **IP アドレス直接ではなく FQDN** で行う必要があるため、FQDN → PE のプライベート IP に名前解決する**プライベート DNS ゾーン**を作成し、VNet にリンクします。
+
+```
+VNet 内のリソース (AppGW など)
+  ↓ DNS クエリ: swa-xxx.azurestaticapps.net
+  ↓
+Azure パブリック DNS
+  ↓ CNAME → swa-xxx.privatelink.azurestaticapps.net
+  ↓
+プライベート DNS ゾーン (privatelink.azurestaticapps.net)  ← VNet にリンク済み
+  ↓ A レコード: swa-xxx → 10.0.4.x (PE の IP)
+  ↓
+Private Endpoint → SWA
+```
+
+> **ポイント**: プライベート DNS ゾーンは VNet にリンクされているため、**VNet 内からの DNS クエリのみ**が PE の IP に解決されます。VNet 外からはパブリック IP に解決されますが、PE 有効化後は SWA 側が 403 で拒否します。
+
 ```bash
 # Private Endpoint 用サブネットの作成
 az network vnet subnet create \
