@@ -280,10 +280,11 @@ az network application-gateway waf-policy custom-rule create \
   --resource-group $RG_NAME \
   --name "RateLimitRule" \
   --priority 10 \
+  --rule-type RateLimitRule \
   --rate-limit-threshold 100 \
   --rate-limit-duration FiveMins \
   --action Block \
-  --group-by-user-session "[{\"groupByVariables\":[{\"variableName\":\"ClientAddr\"}]}]"
+  --group-by-user-session "[{\"group-by-variables\":[{\"variable-name\":\"ClientAddr\"}]}]"
 
 # 日本国外からのアクセスをログに記録するルール (任意)
 # 要件: 日本国外への情報持ち出し防止の監視
@@ -292,8 +293,9 @@ az network application-gateway waf-policy custom-rule create \
   --resource-group $RG_NAME \
   --name "GeoFilterLog" \
   --priority 20 \
+  --rule-type MatchRule \
   --action Log \
-  --match-condition "[{\"matchVariables\":[{\"variableName\":\"RemoteAddr\"}],\"operator\":\"GeoMatch\",\"negationCondition\":true,\"matchValues\":[\"JP\"]}]"
+  --match-conditions "[{\"match-variables\":[{\"variable-name\":\"RemoteAddr\"}],\"operator\":\"GeoMatch\",\"negation-condition\":true,\"match-values\":[\"JP\"]}]"
 ```
 
 **Azure Portal での確認**: WAF ポリシーのカスタムルール画面でレートリミットルールと Geo フィルタルールが作成されていることを確認します。
