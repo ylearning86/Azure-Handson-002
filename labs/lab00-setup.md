@@ -37,7 +37,7 @@
 |--------|-----------|------|
 | [Azure CLI](https://learn.microsoft.com/ja-jp/cli/azure/install-azure-cli) | 2.60+ | Azure リソースの操作 |
 | [Bicep CLI](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/bicep/install) | 0.28+ | IaC テンプレートの作成・デプロイ |
-| [Node.js](https://nodejs.org/) | 20 LTS | SWA CLI ・ Functions API の実行 |
+| [Node.js](https://nodejs.org/) | 22 LTS | SWA CLI ・ Functions API の実行 |
 | [SWA CLI](https://azure.github.io/static-web-apps-cli/) | 最新版 | Static Web Apps のローカル開発・デプロイ |
 | [VS Code](https://code.visualstudio.com/) | 最新版 | エディタ |
 | [Git](https://git-scm.com/) | 最新版 | ソース管理 |
@@ -155,7 +155,7 @@ az provider show --namespace Microsoft.DBforPostgreSQL --query "registrationStat
 
 - [ ] Azure CLI 2.60 以上がインストールされている
 - [ ] Bicep CLI がインストールされている
-- [ ] Node.js 20 以上がインストールされている
+- [ ] Node.js 22 以上がインストールされている
 - [ ] `az login` で Azure にログインできた
 - [ ] リソースグループ `rg-handson-v4` が作成された
 - [ ] GitHub アカウントを持っている

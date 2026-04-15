@@ -134,7 +134,7 @@ az functionapp create \
   --storage-account "${PREFIX}fnstore" \
   --consumption-plan-location $LOCATION \
   --runtime node \
-  --runtime-version 20 \
+  --runtime-version 22 \
   --functions-version 4 \
   --os-type Linux
 

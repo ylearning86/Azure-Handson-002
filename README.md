@@ -54,7 +54,7 @@
 |--------|-----------|------|
 | [Azure CLI](https://learn.microsoft.com/ja-jp/cli/azure/install-azure-cli) | 2.60+ | Azure リソースの操作 |
 | [Bicep CLI](https://learn.microsoft.com/ja-jp/azure/azure-resource-manager/bicep/install) | 0.28+ | IaC テンプレート |
-| [Node.js](https://nodejs.org/) | 20 LTS | SWA CLI・Functions API |
+| [Node.js](https://nodejs.org/) | 22 LTS | SWA CLI・Functions API |
 | [SWA CLI](https://azure.github.io/static-web-apps-cli/) | 最新版 | SWA ローカル開発・デプロイ |
 | [VS Code](https://code.visualstudio.com/) | 最新版 | エディタ |
 | [Git](https://git-scm.com/) | 最新版 | ソース管理 |
