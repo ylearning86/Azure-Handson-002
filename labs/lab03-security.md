@@ -753,7 +753,7 @@ az monitor diagnostic-settings create \
   --name "kv-diagnostics" \
   --resource "$KV_ID" \
   --workspace "$LAW_RESOURCE_ID" \
-  --logs '[{"category":"AuditEvent","enabled":true,"retentionPolicy":{"enabled":true,"days":365}}]' \
+  --logs '[{"category":"AuditEvent","enabled":true}]' \
   --metrics '[{"category":"AllMetrics","enabled":true}]'
 ```
 
