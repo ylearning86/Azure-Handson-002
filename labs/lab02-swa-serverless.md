@@ -185,7 +185,7 @@ curl -s "https://${FUNC_URL}/api/health"
 
 > **WSL の場合**: Azure Functions Core Tools は WSL (Ubuntu) でも動作します。インストール: `npm install -g azure-functions-core-tools@4 --unsafe-perm true`
 
-**Azure Portal での確認**: Functions App の関数一覧で `health` と `status` が表示されればデプロイ成功です。
+**Azure Portal での確認**: Functions App の関数一覧で `health`、`status`、`infra` の3つが表示されればデプロイ成功です。
 
 ![関数一覧](../docs/screenshots/lab02/03-functions-overview.png)
 
