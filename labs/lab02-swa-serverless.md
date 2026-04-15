@@ -277,6 +277,14 @@ curl -s "https://${FUNC_URL}/api/health" | python -m json.tool
 {
   "routes": [
     {
+      "route": "/api/health",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/api/infra",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     },
@@ -300,6 +308,10 @@ curl -s "https://${FUNC_URL}/api/health" | python -m json.tool
   }
 }
 ```
+
+> **ポイント**: `/api/health` と `/api/infra` は死活監視・ダッシュボード用のため `anonymous` でもアクセス可能にしています。それ以外の API (`/api/*`) は `authenticated` のみアクセス可能です。
+
+> **注意**: この時点では SWA の事前構成済み (managed) Entra ID 認証が使われます。Lab03 で Private Endpoint を有効化すると managed 認証が動作しなくなるため、Lab03 でカスタム認証プロバイダーに切り替えます。
 
 ```bash
 # 設定を反映して再デプロイ
