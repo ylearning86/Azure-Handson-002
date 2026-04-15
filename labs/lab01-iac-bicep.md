@@ -373,17 +373,19 @@ param env = 'prod'
 ## Step 6: デプロイを実行する
 
 ```bash
+DEPLOY_NAME="deploy-dev-$(date +%Y%m%d%H%M)"
+
 # 開発環境にデプロイ
 az deployment group create \
   --resource-group $RG_NAME \
   --template-file infra/main.bicep \
   --parameters prefix=$PREFIX env=dev \
-  --name "deploy-dev-$(date +%Y%m%d%H%M)"
+  --name "$DEPLOY_NAME"
 
 # デプロイ結果の確認
 az deployment group show \
   --resource-group $RG_NAME \
-  --name "deploy-dev-*" \
+  --name "$DEPLOY_NAME" \
   --query "properties.outputs" -o json
 ```
 
