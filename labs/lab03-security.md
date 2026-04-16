@@ -539,17 +539,14 @@ az network application-gateway ssl-cert create \
 要件: 「監査ログとして記録・監視」「WAF ログの分析」
 
 ```bash
-# AppGW のリソース ID を取得
-AGW_ID=$(az network application-gateway show \
-  --name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --query id -o tsv)
+# AppGW のリソース ID を手動構成
+# Note: az network application-gateway show は Azure CLI の API バージョン問題
+# (InvalidApiVersionParameter) で失敗するため、リソース ID を直接構成します。
+SUB_ID=$(az account show --query id -o tsv)
+AGW_ID="/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Network/applicationGateways/agw-${PREFIX}"
 
-# Log Analytics のリソース ID を取得
-LAW_RESOURCE_ID=$(az monitor log-analytics workspace show \
-  --resource-group $RG_NAME \
-  --workspace-name "law-${PREFIX}-dev" \
-  --query id -o tsv)
+# Log Analytics のリソース ID を手動構成
+LAW_RESOURCE_ID="/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.OperationalInsights/workspaces/law-${PREFIX}-dev"
 
 # 診断設定を有効化 (WAF ログ + アクセスログ + メトリクス)
 az monitor diagnostic-settings create \
@@ -680,10 +677,13 @@ AzureDiagnostics
 ### (参考) CLI から確認する場合
 
 ```bash
-LAW_ID=$(az monitor log-analytics workspace show \
-  --resource-group $RG_NAME \
-  --workspace-name "law-${PREFIX}-dev" \
-  --query customerId -o tsv)
+# Log Analytics の Customer ID を取得
+# Note: az monitor log-analytics workspace show は Azure CLI の API バージョン問題
+# (InvalidApiVersionParameter) で失敗するため、az rest で API バージョンを明示的に指定します。
+SUB_ID=$(az account show --query id -o tsv)
+LAW_ID=$(az rest --method get \
+  --url "https://management.azure.com/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.OperationalInsights/workspaces/law-${PREFIX}-dev?api-version=2023-09-01" \
+  --query properties.customerId -o tsv)
 
 az monitor log-analytics query \
   --workspace "$LAW_ID" \
@@ -843,11 +843,11 @@ SWA (/api/*) → Functions App (マネージド ID) → Key Vault   ✓
 # Key Vault のリソース ID を取得
 KV_ID=$(az keyvault show --name "kv-${PREFIX}" --query id -o tsv)
 
-# Log Analytics のリソース ID を取得
-LAW_RESOURCE_ID=$(az monitor log-analytics workspace show \
-  --resource-group $RG_NAME \
-  --workspace-name "law-${PREFIX}-dev" \
-  --query id -o tsv)
+# Log Analytics のリソース ID を手動構成
+# Note: az monitor log-analytics workspace show は Azure CLI の API バージョン問題
+# (InvalidApiVersionParameter) で失敗するため、リソース ID を直接構成します。
+SUB_ID=$(az account show --query id -o tsv)
+LAW_RESOURCE_ID="/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.OperationalInsights/workspaces/law-${PREFIX}-dev"
 
 # 診断設定を有効化 (監査ログ + メトリクス)
 az monitor diagnostic-settings create \
