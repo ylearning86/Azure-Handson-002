@@ -25,11 +25,12 @@
 
 | 必要な権限 | 使用する Lab | 操作内容 |
 |-----------|-------------|---------|
-| **アプリケーション登録が可能**であること | Lab03 | `az ad app create` (カスタム認証プロバイダー用 Entra ID アプリ登録) |
+| **アプリケーション登録が可能**であること | Lab08 (オプション) | `az ad app create` (カスタム認証プロバイダー用 Entra ID アプリ登録) |
 | **アプリケーション開発者** (Application Developer) | Lab05 (任意) | `az ad app create`, `az ad sp create`, `az ad app federated-credential create` |
 
-> **Lab03 の補足**: テナント設定で「ユーザーはアプリケーションを登録できる」が「はい」(デフォルト) であれば追加ロール不要です。「いいえ」の場合は **アプリケーション管理者** または **クラウドアプリケーション管理者** ロールが必要です。  
-> 確認方法: Azure Portal → Microsoft Entra ID → ユーザー設定 → 「アプリの登録」
+> **Lab08 の補足**: テナント設定で「ユーザーはアプリケーションを登録できる」が「はい」(デフォルト) であれば追加ロール不要です。「いいえ」の場合は **アプリケーション管理者** または **クラウドアプリケーション管理者** ロールが必要です。  
+> 確認方法: Azure Portal → Microsoft Entra ID → ユーザー設定 → 「アプリの登録」  
+> **注意**: Lab08 はオプションのため、Entra ID 権限がなくても Lab00〜Lab07 は問題なく実施できます。
 
 ### 推定コスト
 
@@ -108,6 +109,7 @@
 | [05](labs/lab05-cicd.md) | SWA 組込み CI/CD | CI/CD | SWA CLI, GitHub Actions | Amplify CLI, GitHub Actions |
 | [06](labs/lab06-backup-dr.md) | バックアップ & DR | 継続性 | Azure Backup, Geo-replication, PITR | AWS Backup, Cross-Region Replication, RDS PITR |
 | [07](labs/lab07-cost-management.md) | コスト管理・最適化 | コスト管理 | Cost Management, Advisor, Budgets | Cost Explorer, Trusted Advisor, AWS Budgets |
+| [08](labs/lab08-auth-optional.md) | Entra ID 認証 (オプション) | セキュリティ (認証) | Entra ID, SWA カスタム認証, AppGW Rewrite Rule | Cognito, ALB 認証 |
 
 ---
 

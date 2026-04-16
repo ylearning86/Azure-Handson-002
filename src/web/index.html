@@ -41,17 +41,6 @@
   <h1>サンプル業務システム</h1>
   <p class="subtitle">Azure ハンズオンで構築したクラウドネイティブアーキテクチャ</p>
 
-  <!-- 認証情報 -->
-  <div class="card">
-    <h2>認証情報 (Easy Auth + カスタム Entra ID)</h2>
-    <div class="flex-row">
-      <span>ログイン状態: <span id="auth-status">確認中...</span></span>
-      <button onclick="location.href='/.auth/login/aad'">Entra ID でログイン</button>
-      <button class="secondary" onclick="location.href='/.auth/logout'">ログアウト</button>
-    </div>
-    <pre id="auth-info" style="display:none;"></pre>
-  </div>
-
   <!-- システムステータス -->
   <div class="card">
     <h2>システムステータス</h2>
@@ -105,21 +94,23 @@
         grid.innerHTML = '';
         // 各コンポーネントをカードで表示
         for (const [key, comp] of Object.entries(data.components)) {
-          const dnsOk = comp.dns === 'resolved';
-          const statusOk = comp.status === 'running' || comp.status === 'deployed' || dnsOk;
-          const badgeClass = statusOk ? 'badge-ok' : 'badge-err';
-          const badgeText = statusOk ? '接続OK' : '未接続';
-          // Lab バッジ
-          const labBadges = (comp.labs || []).map(l =>
-            `<span class="badge badge-lab">${l}</span>`).join('');
+          // デプロイ状態と接続状態を分離表示
+          const deployed = comp.deployed;
+          const connected = comp.connected;
+          const deployBadge = deployed
+            ? '<span class="badge badge-ok">デプロイ済</span>'
+            : '<span class="badge badge-err">未デプロイ</span>';
+          const connBadge = deployed
+            ? (connected ? '<span class="badge badge-ok">接続OK</span>' : '<span class="badge badge-warn">接続NG</span>')
+            : '';
           const item = document.createElement('div');
           item.className = 'infra-item';
           item.innerHTML = `
-            <h3>${comp.name} <span class="badge ${badgeClass}">${badgeText}</span> ${labBadges}</h3>
+            <h3>${comp.name} ${deployBadge} ${connBadge}</h3>
             <div class="type">${comp.type}</div>
             <div class="detail">
-              ${comp.host ? `ホスト: <code>${comp.host}</code><br>` : ''}
-              ${comp.runtime ? `ランタイム: ${comp.runtime}<br>` : ''}
+              ${deployed && comp.host ? `ホスト: <code>${comp.host}</code><br>` : ''}
+              ${comp.detail ? `状態: ${comp.detail}<br>` : ''}
               ${comp.purpose ? `用途: ${comp.purpose}` : ''}
             </div>`;
           grid.appendChild(item);
@@ -131,32 +122,9 @@
       }
     }
 
-    // --- 認証チェック ---
-    async function checkAuth() {
-      try {
-        const res = await fetch('/.auth/me');
-        const data = await res.json();
-        if (data.clientPrincipal) {
-          document.getElementById('auth-status').textContent =
-            'ログイン済み (' + data.clientPrincipal.userDetails + ')';
-          document.getElementById('auth-status').className = 'status-ok';
-          const pre = document.getElementById('auth-info');
-          pre.textContent = JSON.stringify(data.clientPrincipal, null, 2);
-          pre.style.display = 'block';
-        } else {
-          document.getElementById('auth-status').textContent = '未ログイン';
-          document.getElementById('auth-status').className = 'status-info';
-        }
-      } catch (e) {
-        document.getElementById('auth-status').textContent = '確認不可';
-        document.getElementById('auth-status').className = 'status-warn';
-      }
-    }
-
     // --- 初期化 ---
     checkHealth();
     checkInfra();
-    checkAuth();
   </script>
 </body>
 </html>

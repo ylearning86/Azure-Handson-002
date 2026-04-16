@@ -1,32 +1,13 @@
 {
+  "networking": {
+    "allowedIpRanges": ["10.0.0.0/24"]
+  },
   "routes": [
     {
-      "route": "/api/health",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/api/infra",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
       "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/.auth/login/github",
-      "statusCode": 404
-    },
-    {
-      "route": "/.auth/login/twitter",
-      "statusCode": 404
+      "allowedRoles": ["anonymous", "authenticated"]
     }
   ],
-  "responseOverrides": {
-    "401": {
-      "redirect": "/.auth/login/aad",
-      "statusCode": 302
-    }
-  },
   "navigationFallback": {
     "rewrite": "/index.html"
   }

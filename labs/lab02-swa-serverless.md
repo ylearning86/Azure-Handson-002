@@ -11,8 +11,8 @@
 | 要件定義書の記載 | Azure での実装 |
 |------------------|---------------|
 | 原則としてサーバレスの構成 | **SWA (Standard)** + **単体 Azure Functions** (Linked Backend) |
-| マネージドサービスを最大限活用 | SWA CDN + Easy Auth、Functions マネージド ID + VNet 統合 |
-| 認証はクラウドサービスが提供する機能を最大限活用 | SWA **Easy Auth** (Entra ID SSO) |
+| マネージドサービスを最大限活用 | SWA CDN、Functions マネージド ID + VNet 統合 |
+| 認証はクラウドサービスが提供する機能を最大限活用 | SWA **Easy Auth** (Entra ID SSO) → [Lab08](lab08-auth-optional.md) で構成 |
 | 処理能力等の動的調整を実現 | Functions の自動スケーリング |
 | Webブラウザで処理を行う | 静的 HTML/JS + REST API 構成 |
 
@@ -28,8 +28,7 @@
 - [Step 5: SWA と Functions App をリンク (Linked Backend)](#step-5-swa-と-functions-app-をリンク-linked-backend)
 - [Step 6: SWA にフロントエンドをデプロイ](#step-6-swa-にフロントエンドをデプロイ)
 - [Step 7: Linked Backend 経由の動作確認](#step-7-linked-backend-経由の動作確認)
-- [Step 8: 組込み認証 (Easy Auth) の設定](#step-8-組込み認証-easy-auth-の設定)
-- [Step 9: ローカル開発 (SWA CLI + Functions) — オプション](#step-9-ローカル開発-swa-cli--functions--オプション)
+- [Step 8: ローカル開発 (SWA CLI + Functions) — オプション](#step-8-ローカル開発-swa-cli--functions--オプション)
 - [理解度チェック](#理解度チェック)
 
 ---
@@ -94,7 +93,8 @@ ls src/api/host.json
 
 ![サンプルアプリケーション](../docs/screenshots/lab02/app-frontend.png)
 
-> API は Easy Auth により認証必須のため、未ログイン状態では「エラー: Failed to fetch」と表示されます。これは正常動作です。
+> **インフラダッシュボードについて**: 各リソースの「デプロイ済」「接続OK」の表示はハンズオンの進捗に応じて変化します。Lab02 完了時点では Key Vault や PostgreSQL は「未デプロイ」と表示されますが、後続の Lab でリソースを作成するとステータスが更新されます。
+
 > この時点では SWA はパブリックアクセス可能です。Lab03 で Application Gateway + WAF + Private Endpoint を構成し、ネットワークレベルでのアクセス制限を追加します。
 
 ## Step 2: Azure Static Web Apps の作成 (Standard プラン)
@@ -189,6 +189,18 @@ curl -s "https://${FUNC_URL}/api/health"
 
 ![関数一覧](../docs/screenshots/lab02/03-functions-overview.png)
 
+### インフラダッシュボード用の環境変数設定
+
+インフラダッシュボード API (`/api/infra`) は `APP_PREFIX` 環境変数を使って各リソース名を組み立てます。設定しない場合、デフォルト値が使われるため正しいリソースを参照できません。
+
+```bash
+# APP_PREFIX を Functions App に設定
+az functionapp config appsettings set \
+  --name "func-${PREFIX}-api" \
+  --resource-group $RG_NAME \
+  --settings "APP_PREFIX=${PREFIX}"
+```
+
 ## Step 5: SWA と Functions App をリンク (Linked Backend)
 
 要件: 「マネージド ID でバックエンドリソースに安全にアクセス」
@@ -267,66 +279,9 @@ curl -s "https://${FUNC_URL}/api/health" | python -m json.tool
 
 ![Linked Backend](../docs/screenshots/lab02/04-linked-backend.png)
 
-## Step 8: 組込み認証 (Easy Auth) の設定
+> **認証設定について**: Entra ID 認証 (Easy Auth) の設定はオプションの [Lab 08: Entra ID 認証](lab08-auth-optional.md) で行います。Private Endpoint 有効化後はカスタム認証プロバイダーが必要なため、別 Lab として分離しています。
 
-要件: 「認証はクラウドサービスが提供する機能を最大限活用」「SSO を実現」
-
-`src/web/staticwebapp.config.json` で認証制御を設定します:
-
-```json
-{
-  "routes": [
-    {
-      "route": "/api/health",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/api/infra",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/.auth/login/github",
-      "statusCode": 404
-    },
-    {
-      "route": "/.auth/login/twitter",
-      "statusCode": 404
-    }
-  ],
-  "responseOverrides": {
-    "401": {
-      "redirect": "/.auth/login/aad",
-      "statusCode": 302
-    }
-  },
-  "navigationFallback": {
-    "rewrite": "/index.html"
-  }
-}
-```
-
-> **ポイント**: `/api/health` と `/api/infra` は死活監視・ダッシュボード用のため `anonymous` でもアクセス可能にしています。それ以外の API (`/api/*`) は `authenticated` のみアクセス可能です。
-
-> **注意**: この時点では SWA の事前構成済み (managed) Entra ID 認証が使われます。Lab03 で Private Endpoint を有効化すると managed 認証が動作しなくなるため、Lab03 でカスタム認証プロバイダーに切り替えます。
-
-```bash
-# 設定を反映して再デプロイ
-cd src
-swa deploy --app-location web --deployment-token "$DEPLOY_TOKEN" --env production
-cd ..
-
-echo "https://${SWA_URL} をブラウザで開いて認証フローを確認してください"
-```
-
-**ブラウザでの確認**: `https://<SWA のホスト名>` にアクセスし、「Entra ID でログイン」ボタンを押すと、Easy Auth により Entra ID のサインイン画面にリダイレクトされます。ログイン後はアプリに戻り、認証済み状態で API にアクセスできるようになります。
-
-![Easy Auth 認証画面](../docs/screenshots/lab02/08-easy-auth-login.png)
-
-## Step 9: ローカル開発 (SWA CLI + Functions) — オプション
+## Step 8: ローカル開発 (SWA CLI + Functions) — オプション
 
 > **この Step はオプションです。** 時間があれば実施してください。
 
@@ -352,7 +307,6 @@ swa start web --api-location api
 - [ ] 単体 Functions App を作成しマネージド ID を有効化した
 - [ ] Linked Backend で SWA と Functions App をリンクした
 - [ ] SWA の `/api/*` が Functions App に転送されることを確認した
-- [ ] Easy Auth による認証制御を設定した
 
 ### 要件 → Azure 実装の対応表
 
@@ -360,8 +314,8 @@ swa start web --api-location api
 |------------------|---------------|
 | サーバレス構成 | SWA (Standard) + Functions (Consumption) |
 | マネージドサービス活用 | SWA (CDN, HTTPS, 認証) + Functions (マネージド ID, VNet 統合) |
-| 認証はクラウド機能を活用 | Easy Auth (Entra ID SSO) |
-| SSO を実現 | `/.auth/login/aad` による Entra ID 連携 |
+| 認証はクラウド機能を活用 | Easy Auth (Entra ID SSO) → Lab08 で構成 |
+| SSO を実現 | `/.auth/login/aad` による Entra ID 連携 → Lab08 で構成 |
 | マネージド ID (パスワードレス) | Functions のシステム割り当て ID → Lab03 で Key Vault 等に接続 |
 | 処理能力の動的調整 | Functions Consumption プラン (自動スケール) |
 | Webブラウザで処理 | 静的 HTML/JS + REST API (Linked Backend) |
