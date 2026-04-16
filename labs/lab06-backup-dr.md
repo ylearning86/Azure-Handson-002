@@ -49,15 +49,15 @@ az postgres flexible-server create \
   --tier Burstable \
   --storage-size 32 \
   --version 16 \
-  --high-availability Disabled \
+  --zonal-resiliency Disabled \
   --backup-retention 28 \
   --geo-redundant-backup Disabled \
   --yes
 
-# ※ --high-availability は非推奨です。将来は --zonal-resiliency を使用してください
+# ※ --high-availability は非推奨のため、--zonal-resiliency を使用しています
 # ※ ハンズオン環境ではコスト節約のため HA と Geo-backup を Disabled にしています
 # 本番環境では以下のように設定します:
-#   --high-availability ZoneRedundant   (要件: マルチAZ)
+#   --zonal-resiliency Enabled           (要件: マルチAZ)
 #   --geo-redundant-backup Enabled       (要件: 別リージョン隔地保管)
 #   --backup-retention 35               (要件: 4週間+α)
 ```
