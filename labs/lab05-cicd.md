@@ -105,7 +105,7 @@ gh secret list --repo <your-username>/Azure-Handson-002
    - ブランチ: `main`
    - ビルドプリセット: **Custom**
    - アプリの場所: `src/web`
-   - API の場所: `src/api`
+   - API の場所: (空白)
    - 出力の場所: (空白)
 4. **保存** → GitHub Actions ワークフローが自動生成される
 
@@ -150,7 +150,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "src/web"     # フロントエンド
-          api_location: "src/api"     # Functions API
+          api_location: ""              # API は Linked Backend なので空 (重要)
           output_location: ""
 
   # PR クローズ時にプレビュー環境を自動削除
@@ -170,6 +170,7 @@ jobs:
 - `AZURE_STATIC_WEB_APPS_API_TOKEN` は SWA が GitHub Secrets に**自動設定**
 - OIDC のような追加認証設定が**不要**
 - Push と Pull Request の両方に対応
+- `api_location` は**空**にしてください。Lab02 で Linked Backend を構成しているため、API は単体 Functions App が処理します。`api_location` に `src/api` を指定すると SWA の Managed Functions としてデプロイされ、Linked Backend と競合します
 
 **確認**: GitHub リポジトリの `.github/workflows/` にワークフロー YAML が登録されていることを確認します。
 

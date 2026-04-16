@@ -29,7 +29,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "src/web"     # フロントエンド
-          api_location: "src/api"     # Functions API
+          api_location: ""              # API は Linked Backend なので空
           output_location: ""
 
   # PR クローズ時にプレビュー環境を自動削除
