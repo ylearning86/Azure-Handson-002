@@ -89,13 +89,12 @@ ls src/api/status/index.js
 ls src/api/host.json
 ```
 
-**サンプルアプリケーションの画面**: SWA にデプロイ後、`https://<SWA のホスト名>` (例: `https://xxxxx.7.azurestaticapps.net`) にブラウザでアクセスすると以下のような画面が表示されます。SWA の URL は Step 6 のデプロイ後に確認できます。
+**サンプルアプリケーションの画面**: SWA にフロントエンドをデプロイ後、ブラウザでアクセスすると以下のような画面が表示されます。フロントエンドのデプロイは Step 6 で行います。
 
 ![サンプルアプリケーション](../docs/screenshots/lab02/app-frontend.png)
 
 > **インフラダッシュボードについて**: 各リソースの「デプロイ済」「接続OK」の表示はハンズオンの進捗に応じて変化します。Lab02 完了時点では Key Vault や PostgreSQL は「未デプロイ」と表示されますが、後続の Lab でリソースを作成するとステータスが更新されます。
 
-> この時点では SWA はパブリックアクセス可能です。Lab03 で Application Gateway + WAF + Private Endpoint を構成し、ネットワークレベルでのアクセス制限を追加します。
 
 ## Step 2: Azure Static Web Apps の作成 (Standard プラン)
 
@@ -114,6 +113,13 @@ az staticwebapp create \
 **Azure Portal での確認**: SWA が Standard プランで作成されたことを確認します。
 
 ![SWA 概要](../docs/screenshots/lab02/02-swa-overview.png)
+
+**ブラウザでの確認**: SWA の URL にアクセスすると、フロントエンド未デプロイのデフォルトページが表示されます。Step 6 でフロントエンドをデプロイすると、サンプル業務システムの画面に切り替わります。
+
+
+![SWA デフォルトページ (デプロイ前)](../docs/screenshots/lab02/swa-before-deploy.png)
+
+
 
 ## Step 3: 単体 Azure Functions App の作成
 
@@ -254,6 +260,13 @@ cd ..
 **Azure Portal での確認**: SWA の環境画面で「実稼働」環境にデプロイされていることを確認します。
 
 ![デプロイ完了](../docs/screenshots/lab02/07-swa-deploy.png)
+
+**ブラウザでの確認**: SWA の URL (`https://<SWA のホスト名>`) にアクセスし、サンプル業務システムの画面が表示されることを確認します。
+
+![サンプルアプリケーション (デプロイ後)](../docs/screenshots/lab02/app-frontend.png)
+
+> この時点では SWA はパブリックアクセス可能です。Lab03 で Application Gateway + WAF + Private Endpoint を構成し、ネットワークレベルでのアクセス制限を追加します。
+
 
 ## Step 7: Linked Backend 経由の動作確認
 
