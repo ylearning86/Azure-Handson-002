@@ -253,15 +253,21 @@ PR #2         → https://xxx-2.azurestaticapps.net/        (プレビュー)
 ![プレビュー環境](../docs/screenshots/lab05/05-preview-browser.png)
 
 > **注意**: Lab 03 で Private Endpoint を設定済みの場合、プレビュー環境への直接アクセスは 403 になります。
-> プレビュー環境の動作確認は Application Gateway 経由、または Private Endpoint を一時的に無効化して行います。
+> プレビュー環境の動作確認は Application Gateway 経由、またはパブリックアクセスを自分の IP のみ許可して行います。
 
-### プレビュー環境に直接アクセスする場合 (Private Endpoint の一時無効化)
+### プレビュー環境に直接アクセスする場合 (パブリックアクセスの一時有効化)
+
+PE を削除する代わりに、`publicNetworkAccess` を一時的に `Enabled` に切り替えます。PE はそのまま維持されるため、AGW 経由の VNet 内アクセスに影響しません。
+
+> **注意**: SWA はリソースレベルの IP フィルタリングをサポートしていないため、`publicNetworkAccess=Enabled` にすると全パブリック IP からアクセス可能になります。確認作業は短時間で行い、速やかに `Disabled` に戻してください。
 
 ```bash
-# 1. Private Endpoint を一時的に削除
-az network private-endpoint delete \
-  --name "pe-${PREFIX}-swa" \
-  --resource-group $RG_NAME
+# 1. パブリックアクセスを一時的に有効化 (PE は維持したまま)
+az resource update \
+  --resource-group $RG_NAME \
+  --name "swa-${PREFIX}" \
+  --resource-type "Microsoft.Web/staticSites" \
+  --set properties.publicNetworkAccess=Enabled
 
 # 2. プレビュー環境の URL を確認
 az staticwebapp environment list \
@@ -272,25 +278,19 @@ az staticwebapp environment list \
 # 3. ブラウザでプレビュー URL にアクセスして動作確認
 #    例: https://xxx-2.eastasia.7.azurestaticapps.net/
 
-# 4. 確認が終わったら Private Endpoint を再作成
-MSYS_NO_PATHCONV=1 az network private-endpoint create \
-  --name "pe-${PREFIX}-swa" \
+# 4. 確認が終わったらパブリックアクセスを無効化
+az resource update \
   --resource-group $RG_NAME \
-  --vnet-name "vnet-${PREFIX}-dev" \
-  --subnet snet-pe \
-  --private-connection-resource-id "$(az staticwebapp show \
-    --name "swa-${PREFIX}" \
-    --resource-group $RG_NAME \
-    --query id -o tsv)" \
-  --group-ids staticSites \
-  --connection-name swa-pe-connection
+  --name "swa-${PREFIX}" \
+  --resource-type "Microsoft.Web/staticSites" \
+  --set properties.publicNetworkAccess=Disabled
 
-# 5. AGW 経由のアクセスが復旧したことを確認
+# 5. AGW 経由のアクセスが引き続き正常であることを確認
 curl -sk -o /dev/null -w "HTTP Status: %{http_code}\n" \
   "https://${PREFIX}.japaneast.cloudapp.azure.com/"
 ```
 
-> **注意**: Private Endpoint 削除中は SWA にパブリックからも直接アクセス可能になります。確認後は速やかに再作成してください。
+> **ポイント**: PE を削除・再作成する方法と比べ、`publicNetworkAccess` の切り替えだけで済むため、AGW 経由のアクセスに影響せず、DNS 再伝播の待ち時間も不要です。
 
 ---
 
