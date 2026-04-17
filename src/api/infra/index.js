@@ -133,12 +133,13 @@ module.exports = async function (context, req) {
 
   const [pgTcp, storageHttp, kvHttp] = await Promise.all([
     checkTcp(pgHost, 5432),
-    checkHttps(storageHost, '/', 5000, storageHeaders),
+    checkHttps(storageHost, '/?comp=list', 5000, storageHeaders),
     checkHttps(kvHost, '/secrets?api-version=7.4', 5000, kvHeaders),
   ]);
 
   // デプロイ状態と接続状態を分離して判定
-  const pgDeployed = pgTcp.reachable;
+  // PostgreSQL: ENOTFOUND = DNS 解決失敗 = 未デプロイ、timeout/ECONNREFUSED 等 = デプロイ済だがネットワーク制限
+  const pgDeployed = pgTcp.reachable || (pgTcp.error && pgTcp.error !== 'ENOTFOUND');
   const storageDeployed = isStorageDeployed(storageHttp);
   const kvDeployed = isKeyVaultDeployed(kvHttp);
 
@@ -154,7 +155,11 @@ module.exports = async function (context, req) {
       host: pgHost,
       deployed: pgDeployed,
       connected: pgConnected,
-      detail: pgTcp.reachable ? 'TCP:5432 接続OK' : `TCP:5432 ${pgTcp.error}`,
+      detail: pgTcp.reachable
+        ? 'TCP:5432 接続OK'
+        : pgDeployed
+          ? `TCP:5432 ${pgTcp.error} (PE/ファイアウォールで制限中)`
+          : `TCP:5432 ${pgTcp.error}`,
       purpose: 'RDB (バックアップ・DR 対象)'
     },
     storage: {
