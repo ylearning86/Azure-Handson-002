@@ -72,6 +72,19 @@ az postgres flexible-server create \
 > | Geo-backup | Disabled | Enabled |
 > | Retention | 28日 | 35日 |
 
+```bash
+# Azure サービスからのアクセスを許可 (Functions App → PostgreSQL 接続用)
+# ※ インフラダッシュボードの PostgreSQL 接続チェックに必要
+az postgres flexible-server firewall-rule create \
+  --name "pg-${PREFIX}" \
+  --resource-group $RG_NAME \
+  --rule-name "AllowAzureServices" \
+  --start-ip-address 0.0.0.0 \
+  --end-ip-address 0.0.0.0
+```
+
+> **セキュリティ補足**: `0.0.0.0 - 0.0.0.0` は Azure 内の全サービスからのアクセスを許可します。ハンズオン環境では簡便のためこの設定を使用しますが、本番環境では Functions App の VNet 統合 + PostgreSQL の VNet 統合 (delegated subnet) を使い、パブリックアクセス自体を無効にしてください。
+
 **作成結果 (Azure Portal)**:
 
 ![PostgreSQL 概要](../docs/screenshots/lab06/01-postgres-overview.png)
