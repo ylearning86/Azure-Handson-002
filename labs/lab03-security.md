@@ -403,7 +403,44 @@ az network application-gateway create \
   --frontend-port 80
 
 echo "Application Gateway の作成には 5-10 分かかります..."
+```
 
+<details>
+<summary>エラー: ApplicationGatewaySubnetInboundTrafficBlockedByNetworkSecurityGroup が出た場合</summary>
+
+サブスクリプションのポリシーや Azure CLI のバージョンによっては、サブネット作成時に NSG が自動付与され、AppGW v2 に必要なポート (65200-65535) がブロックされてデプロイが失敗する場合があります。
+
+```bash
+# エラー例:
+# "Network security group blocks incoming internet traffic on ports 65200 - 65535
+#  to subnet snet-appgw. This is not permitted for Application Gateways that have V2 Sku."
+
+# 対処: snet-appgw に自動作成された NSG に AllowGatewayManager ルールを追加
+NSG_NAME=$(az network vnet subnet show \
+  --resource-group $RG_NAME \
+  --vnet-name "vnet-${PREFIX}-dev" \
+  --name "snet-appgw" \
+  --query "networkSecurityGroup.id" -o tsv | xargs basename)
+
+az network nsg rule create \
+  --resource-group $RG_NAME \
+  --nsg-name "$NSG_NAME" \
+  --name "AllowGatewayManager" \
+  --priority 100 \
+  --direction Inbound \
+  --access Allow \
+  --protocol Tcp \
+  --source-address-prefix GatewayManager \
+  --source-port-range "*" \
+  --destination-address-prefix "*" \
+  --destination-port-range "65200-65535"
+
+# ルール追加後、上記の az network application-gateway create を再実行してください
+```
+
+</details>
+
+```bash
 # バックエンド HTTP 設定でホスト名を上書き
 # (AppGW → PE 経由で SWA にアクセスするために SWA のホスト名が必要)
 az network application-gateway http-settings update \
