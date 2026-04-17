@@ -262,194 +262,154 @@ PR #2         → https://xxx-2.azurestaticapps.net/        (プレビュー)
 
 > **注意**: Lab 03 で Private Endpoint を設定済みの場合、プレビュー環境への直接アクセスは 403 になります。
 > これは PE が存在する SWA ではステージング環境へのパブリックアクセスが PE 経由に強制される仕様のためです (`publicNetworkAccess=Enabled` にしても Production のみに適用され、プレビュー環境は 403 のままです)。
-> プレビュー環境の動作確認は Application Gateway 経由で行います (後述のオプション手順を参照)。
+> プレビュー環境の動作確認は、同じ VNet 内の踏み台 VM から PE 経由でアクセスします (後述のオプション手順を参照)。
 
 <details>
-<summary><strong>(オプション) AGW パスベースルーティングでプレビュー環境にアクセス</strong></summary>
+<summary><strong>(オプション) 踏み台 VM でプレビュー環境にアクセス</strong></summary>
 
-> **難易度: 高** — AGW のルーティングルールを Basic から PathBasedRouting に変更するには、**ルールの削除・再作成**が必要です。既存の Basic ルールを直接 PathBasedRouting に変更することはできない場合があるため、十分注意して実施してください。
-
-PE 環境でプレビュー環境にアクセスするには、AGW にパスベースルーティングを構成し、`/preview/*` パスをプレビュー環境の PE IP にルーティングします。これにより Production と Preview を**同時にアクセス可能**にでき、本番環境に影響を与えません。
+PE 環境でプレビュー環境にアクセスするには、同じ VNet 内に踏み台 VM を作成し、PE 経由でプレビュー URL にアクセスします。AGW の設定変更が不要で、**複数 PR のプレビュー環境すべてに直接アクセス可能**です。
 
 ```text
-AGW
-├─ /* (デフォルト)     → Production PE IP  + Production ホストヘッダー
-└─ /preview/*         → Preview PE IP     + Preview ホストヘッダー
-    └─ Rewrite: /preview/xxx → /xxx
+VNet (10.0.0.0/16)
+├─ snet-pe   (10.0.4.0/24)  ← PE (Production: 10.0.4.4, Preview: 10.0.4.5)
+└─ snet-mgmt (10.0.3.0/24)  ← 踏み台 VM (Windows Server)
+    └─ ブラウザでプレビュー URL にアクセス
 ```
 
-#### 1. プレビュー環境の PE IP を確認
+#### 1. 踏み台 VM の作成
+
+同じ VNet の管理用サブネットに Windows Server VM を作成します。パブリック IP は付与せず、Azure Bastion 経由でアクセスします。
 
 ```bash
-# Private DNS ゾーンの A レコードから Preview の PE IP を確認
+# NIC を作成 (パブリック IP なし)
+SUBNET_ID=$(az network vnet subnet show \
+  --vnet-name "vnet-${PREFIX}-dev" \
+  --name snet-mgmt \
+  --resource-group $RG_NAME \
+  --query id -o tsv)
+
+az network nic create \
+  --resource-group $RG_NAME \
+  --name "nic-${PREFIX}-bastion" \
+  --subnet "$SUBNET_ID" \
+  -o none
+
+# Windows Server VM を作成
+az vm create \
+  --resource-group $RG_NAME \
+  --name "vm-${PREFIX}-bastion" \
+  --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition:latest \
+  --size Standard_D2als_v6 \
+  --nics "nic-${PREFIX}-bastion" \
+  --admin-username azureuser \
+  --admin-password "<任意の強力なパスワード>" \
+  --authentication-type password
+```
+
+> **注意**: B シリーズの VM はクォータ不足でデプロイできない場合があります。その場合は D シリーズ (`Standard_D2als_v6` など) を使用してください。
+
+#### 2. NSG でBastion からの RDP を許可
+
+管理用サブネットの NSG に RDP (ポート 3389) の許可ルールを追加します。
+
+```bash
+# snet-mgmt の NSG 名を確認
+NSG_NAME=$(az network vnet subnet show \
+  --vnet-name "vnet-${PREFIX}-dev" \
+  --name snet-mgmt \
+  --resource-group $RG_NAME \
+  --query "networkSecurityGroup.id" -o tsv | xargs basename)
+
+# Bastion からの RDP を許可
+az network nsg rule create \
+  --nsg-name "$NSG_NAME" \
+  --resource-group $RG_NAME \
+  --name "AllowBastionRDP" \
+  --priority 100 \
+  --direction Inbound \
+  --access Allow \
+  --protocol Tcp \
+  --source-address-prefixes "VirtualNetwork" \
+  --destination-port-ranges 3389 \
+  -o none
+```
+
+#### 3. Bastion で VM にログイン
+
+1. Azure Portal → VM `vm-${PREFIX}-bastion` → **接続** → **Bastion 経由で接続**
+2. ユーザー名とパスワードを入力してログイン
+
+#### 4. プレビュー環境の PE IP を確認
+
+```bash
+# プレビュー環境の URL とPE IP を確認
+az staticwebapp environment list \
+  --name "swa-${PREFIX}" \
+  --resource-group $RG_NAME \
+  --query "[].{buildId:buildId, hostname:hostname}" -o table
+
+# Private DNS の A レコードから PE IP を確認
 az network private-dns record-set a list \
   --resource-group $RG_NAME \
   --zone-name "privatelink.azurestaticapps.net" \
   --query "[].{name:name, ip:aRecords[0].ipv4Address}" -o table
-
-# 出力例:
-# Name                                     Ip
-# ---------------------------------------  ---------
-# salmon-grass-xxx.7                       10.0.4.4   ← Production
-# salmon-grass-xxx-1.eastasia.7            10.0.4.5   ← Preview
 ```
 
-#### 2. Preview 用バックエンドプールと HTTP 設定を作成
+#### 5. hosts ファイルを編集
+
+VM 内で**管理者権限のメモ帳**を開き、`C:\Windows\System32\drivers\etc\hosts` にプレビュー環境の PE IP を追記します。
+
+1. スタートメニュー → **メモ帳** を右クリック → **管理者として実行**
+2. ファイル → 開く → `C:\Windows\System32\drivers\etc\hosts` (「すべてのファイル」に切り替え)
+3. 末尾に以下を追記して保存:
+
+```text
+# SWA Preview Environment (PE 経由)
+10.0.4.5  salmon-grass-xxx-N.eastasia.7.azurestaticapps.net
+```
+
+> `salmon-grass-xxx-N` と `10.0.4.5` は手順 4 で確認した実際の値に置き換えてください。
+
+または、PowerShell (管理者) で追記:
+
+```powershell
+# PowerShell (管理者) で実行
+Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" `
+  -Value "10.0.4.5  salmon-grass-xxx-N.eastasia.7.azurestaticapps.net"
+```
+
+#### 6. ブラウザでプレビュー環境にアクセス
+
+VM 内のブラウザ (Edge) でプレビュー環境の URL にアクセスします:
+
+```text
+https://salmon-grass-xxx-N.eastasia.7.azurestaticapps.net/
+```
+
+hosts ファイルにより PE IP に名前解決され、VNet 内から PE 経由でプレビュー環境にアクセスできます。
+
+> **ポイント**: この方法なら AGW の設定変更が不要で、**複数 PR のプレビュー環境すべてに hosts 追記だけでアクセス可能**です。PR クローズ後は hosts から該当行を削除してください。
+
+#### 7. クリーンアップ
+
+プレビュー確認が不要になったら、VM を停止またはリソースごと削除してコストを抑えます。
 
 ```bash
-# Preview 環境のホスト名を変数に設定
-PREVIEW_HOSTNAME=$(az staticwebapp environment list \
-  --name "swa-${PREFIX}" \
+# VM を停止 (割り当て解除 → 課金停止)
+az vm deallocate \
   --resource-group $RG_NAME \
-  --query "[?buildId=='1'].hostname" -o tsv)
+  --name "vm-${PREFIX}-bastion"
 
-PREVIEW_PE_IP="10.0.4.5"  # 手順 1 で確認した Preview の PE IP
-
-# Preview 用バックエンドプール
-az network application-gateway address-pool create \
-  --gateway-name "agw-${PREFIX}" \
+# または VM と関連リソースを削除
+az vm delete \
   --resource-group $RG_NAME \
-  --name "previewBackendPool" \
-  --servers $PREVIEW_PE_IP \
-  -o none
+  --name "vm-${PREFIX}-bastion" \
+  --yes
 
-# Preview 用 HTTP 設定 (ホストヘッダーを Preview 環境に設定)
-az network application-gateway http-settings create \
-  --gateway-name "agw-${PREFIX}" \
+az network nic delete \
   --resource-group $RG_NAME \
-  --name "previewBackendHttpSettings" \
-  --port 443 \
-  --protocol Https \
-  --host-name "$PREVIEW_HOSTNAME" \
-  -o none
+  --name "nic-${PREFIX}-bastion"
 ```
-
-#### 3. URL パスマップとリライトルールを作成
-
-```bash
-# URL パスマップ: /preview/* → Preview, それ以外 → Production
-az network application-gateway url-path-map create \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "pathMap" \
-  --paths "/preview/*" \
-  --rule-name "previewRule" \
-  --address-pool "previewBackendPool" \
-  --http-settings "previewBackendHttpSettings" \
-  --default-address-pool "appGatewayBackendPool" \
-  --default-http-settings "appGatewayBackendHttpSettings" \
-  -o none
-
-# リライトルールセットを作成
-az network application-gateway rewrite-rule set create \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "previewRewriteSet" \
-  -o none
-
-# リライトルール: /preview/xxx → /xxx にパスを書き換え
-az network application-gateway rewrite-rule create \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --rule-set-name "previewRewriteSet" \
-  --name "stripPreviewPrefix" \
-  --sequence 100 \
-  --modified-path "/{var_uri_path_1}" \
-  --enable-reroute true \
-  --conditions "[{\"variable\":\"var_uri_path\",\"pattern\":\"/preview/(.*)\",\"ignore-case\":true,\"negate\":false}]" \
-  -o none
-
-# リライトルールセットを URL パスマップの preview ルールに関連付け
-az network application-gateway url-path-map rule create \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --path-map-name "pathMap" \
-  --name "previewRule" \
-  --paths "/preview/*" \
-  --address-pool "previewBackendPool" \
-  --http-settings "previewBackendHttpSettings" \
-  --rewrite-rule-set "previewRewriteSet" \
-  -o none
-```
-
-#### 4. HTTPS ルールを PathBasedRouting に変更
-
-```bash
-# HTTPS ルールを PathBasedRouting に変更し、URL パスマップを関連付け
-# ※ Basic → PathBasedRouting への変更ができない場合はルールを削除して再作成
-az network application-gateway rule update \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "httpsRule" \
-  --rule-type PathBasedRouting \
-  --url-path-map "pathMap" \
-  -o none
-```
-
-#### 5. 動作確認
-
-```bash
-# Production (デフォルトパス)
-curl -sk -o /dev/null -w "Production: %{http_code}\n" \
-  "https://${PREFIX}.japaneast.cloudapp.azure.com/"
-
-# Preview (パスベースルーティング)
-curl -sk -o /dev/null -w "Preview: %{http_code}\n" \
-  "https://${PREFIX}.japaneast.cloudapp.azure.com/preview/"
-
-# Preview API (リライトにより /preview/api/status → /api/status)
-curl -sk "https://${PREFIX}.japaneast.cloudapp.azure.com/preview/api/status" | head -5
-```
-
-> **ポイント**: パスベースルーティングにより、Production と Preview が**同じ AGW FQDN で同時にアクセス可能**です。本番環境のバックエンドを切り替える必要がないため、ユーザーへの影響がありません。
-
-#### 6. クリーンアップ (PR クローズ後)
-
-PR をクローズまたはマージすると、SWA 側のプレビュー環境は自動削除されますが、**AGW 側の設定は残ったまま**です。プレビュー環境が削除された後も AGW の `/preview/*` パスにアクセスすると、SWA が Production のコンテンツをフォールバックで返すため 200 が返ります。
-
-不要になった AGW のプレビュー用設定は手動で削除してください:
-
-```bash
-# 1. HTTPS ルールを Basic に戻す
-az network application-gateway rule update \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "httpsRule" \
-  --rule-type Basic \
-  --address-pool "appGatewayBackendPool" \
-  --http-settings "appGatewayBackendHttpSettings" \
-  --url-path-map "" \
-  -o none
-
-# 2. URL パスマップを削除
-az network application-gateway url-path-map delete \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "pathMap" \
-  -o none
-
-# 3. リライトルールセットを削除
-az network application-gateway rewrite-rule set delete \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "previewRewriteSet" \
-  -o none
-
-# 4. Preview 用バックエンドプールと HTTP 設定を削除
-az network application-gateway address-pool delete \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "previewBackendPool" \
-  -o none
-
-az network application-gateway http-settings delete \
-  --gateway-name "agw-${PREFIX}" \
-  --resource-group $RG_NAME \
-  --name "previewBackendHttpSettings" \
-  -o none
-```
-
-> **注意**: 実運用では、PR クローズ時に AGW のプレビュー用設定も自動削除するよう CI/CD パイプラインで自動化することを推奨します。
 
 </details>
 
