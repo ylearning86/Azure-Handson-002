@@ -364,7 +364,12 @@ MSYS_NO_PATHCONV=1 az rest --method put \
 
 > **所要時間**: Application Gateway の作成には **15-20 分程度**かかります。作成コマンド実行後、完了を待つ間に次の Step の説明を読み進めておくことをお勧めします。
 
+> **Git Bash 利用時の注意 (MSYS パス変換問題)**: Git Bash (MSYS2) は `/subscriptions/...` のような `/` で始まる文字列を Windows パス (`C:/Program Files/Git/subscriptions/...`) に自動変換する仕様があります。これにより `$PE_NIC_ID` や `$PE_IP` が正しく渡らず、`Backend Address Pool must have either Fqdn or IpAddress specified` エラーが発生します。**以下のコマンドブロック全体を `export MSYS_NO_PATHCONV=1` で囲んで実行してください**。完了後に `unset MSYS_NO_PATHCONV` で元に戻します。
+
 ```bash
+# Git Bash の場合、パス変換を無効化 (必須)
+export MSYS_NO_PATHCONV=1
+
 # SWA の Private Endpoint IP を取得 (NIC 経由)
 PE_NIC_ID=$(az network private-endpoint show \
   --name "pe-${PREFIX}-swa" \
@@ -403,6 +408,9 @@ az network application-gateway create \
   --frontend-port 80
 
 echo "Application Gateway の作成には 5-10 分かかります..."
+
+# パス変換の無効化を解除
+unset MSYS_NO_PATHCONV
 ```
 
 <details>
@@ -652,7 +660,7 @@ curl -s "https://${SWA_HOSTNAME}/" -o /dev/null -w "SWA 直接アクセス: HTTP
 
 Step 8 のテストで WAF がブロックしたリクエストが Log Analytics に記録されています。KQL でクエリして確認します。
 
-> **注意**: 診断ログが Log Analytics に反映されるまで**数分～10分程度**かかる場合があります。
+> **注意**: 診断ログが Log Analytics に反映されるまで **10分～20分程度** かかる場合があります。クエリ結果が空の場合は時間をおいて再実行してください。
 
 Azure Portal → **Log Analytics ワークスペース** (`law-${PREFIX}-dev`) → 左メニュー「**ログ**」 → 右上のドロップダウンを **KQL モード** に切り替えてから、以下のクエリをコピー & 実行してください。
 
