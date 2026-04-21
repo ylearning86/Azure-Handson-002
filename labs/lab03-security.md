@@ -594,10 +594,12 @@ AGW_ID="/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.N
 LAW_RESOURCE_ID="/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.OperationalInsights/workspaces/law-${PREFIX}-dev"
 
 # 診断設定を有効化 (WAF ログ + アクセスログ + メトリクス)
+# --export-to-resource-specific: リソース固有テーブル (AGWFirewallLogs, AGWAccessLogs) に送信
 az monitor diagnostic-settings create \
   --name "agw-diagnostics" \
   --resource "$AGW_ID" \
   --workspace "$LAW_RESOURCE_ID" \
+  --export-to-resource-specific true \
   --logs '[
     {"category":"ApplicationGatewayAccessLog","enabled":true},
     {"category":"ApplicationGatewayFirewallLog","enabled":true},
@@ -661,6 +663,25 @@ curl -s "https://${SWA_HOSTNAME}/" -o /dev/null -w "SWA 直接アクセス: HTTP
 Step 8 のテストで WAF がブロックしたリクエストが Log Analytics に記録されています。KQL でクエリして確認します。
 
 > **注意**: 診断ログが Log Analytics に反映されるまで **10分～20分程度** かかる場合があります。クエリ結果が空の場合は時間をおいて再実行してください。
+>
+> **トラブルシューティング**:
+> - `'AGWFirewallLogs' is not recognized` エラー → 診断ログがまだ Log Analytics に到着していません。Step 7 の診断設定が完了しているか確認し、**10〜20 分待ってから**再実行してください。
+> - テーブルが `AzureDiagnostics` になっている場合 → Step 7 で `--export-to-resource-specific true` なしで実行した可能性があります。診断設定を削除して再作成するか、以下のレガシークエリを使用してください:
+>
+> <details>
+> <summary>レガシーモード (AzureDiagnostics) の場合のクエリ</summary>
+>
+> ```kql
+> AzureDiagnostics
+> | where ResourceType == "APPLICATIONGATEWAYS"
+> | where Category == "ApplicationGatewayFirewallLog"
+> | where action_s == "Blocked"
+> | project TimeGenerated, clientIp_s, requestUri_s, ruleId_s, details_message_s, action_s
+> | order by TimeGenerated desc
+> | take 50
+> ```
+>
+> </details>
 
 Azure Portal → **Log Analytics ワークスペース** (`law-${PREFIX}-dev`) → 左メニュー「**ログ**」 → 右上のドロップダウンを **KQL モード** に切り替えてから、以下のクエリをコピー & 実行してください。
 
@@ -675,6 +696,21 @@ AzureDiagnostics
 | order by TimeGenerated desc
 | take 50
 ```
+
+<details>
+<summary>リソース固有テーブル (AGWFirewallLogs) を使う場合</summary>
+
+診断設定で「リソース固有」モードを選択している場合は、`AzureDiagnostics` ではなく `AGWFirewallLogs` テーブルを使用します。カラム名も `_s` サフィックスなしに変わります。
+
+```kql
+AGWFirewallLogs
+| where Action == "Blocked"
+| project TimeGenerated, ClientIp, RequestUri, RuleId, Message, Action
+| order by TimeGenerated desc
+| take 50
+```
+
+</details>
 
 ![WAF ブロックログ](../docs/screenshots/lab03/12a-waf-blocked-logs.png)
 
@@ -701,6 +737,19 @@ AzureDiagnostics
 | summarize count() by ruleGroup_s
 | order by count_ desc
 ```
+
+<details>
+<summary>リソース固有テーブル (AGWFirewallLogs) を使う場合</summary>
+
+```kql
+AGWFirewallLogs
+| where Action in ("Blocked", "Matched")
+| where RuleGroup != "BLOCKING-EVALUATION" and RuleGroup != ""
+| summarize count() by RuleGroup
+| order by count_ desc
+```
+
+</details>
 
 ![ルールグループ別サマリ](../docs/screenshots/lab03/12b-waf-rule-summary.png)
 
@@ -736,6 +785,19 @@ az monitor log-analytics query \
   --timespan P1D \
   -o table
 ```
+
+<details>
+<summary>リソース固有テーブル (AGWFirewallLogs) を使う場合</summary>
+
+```bash
+az monitor log-analytics query \
+  --workspace "$LAW_ID" \
+  --analytics-query 'AGWFirewallLogs | where Action == "Blocked" | project TimeGenerated, ClientIp, RequestUri, RuleId, RuleGroup, Message | order by TimeGenerated desc | take 10' \
+  --timespan P1D \
+  -o table
+```
+
+</details>
 
 > **注意**: `--workspace` には **Customer ID** (GUID) を指定します。ワークスペース名ではなく `--query customerId` で取得した値です。
 
